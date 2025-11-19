@@ -2,7 +2,8 @@
 
 A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/api/sqlite) (`bun:sqlite`). Zero Node.js dependencies, optimized for Bun runtime.
 
-[![Tests](https://img.shields.io/badge/tests-51%2F51%20passing-success)](./tests)
+[![npm version](https://img.shields.io/npm/v/prisma-adapter-bunsqlite)](https://www.npmjs.com/package/prisma-adapter-bunsqlite)
+[![Tests](https://img.shields.io/badge/tests-54%2F54%20passing-success)](./tests)
 [![Bun](https://img.shields.io/badge/bun-v1.3.2+-black)](https://bun.sh)
 [![Prisma](https://img.shields.io/badge/prisma-6.19.0+-blue)](https://prisma.io)
 
@@ -11,17 +12,16 @@ A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/a
 - **🚀 Zero Dependencies**: Uses Bun's native `bun:sqlite` - no Node.js packages required
 - **⚡ Performance**: Native Bun API is faster than Node.js alternatives
 - **🎯 Simple Deployment**: Single binary deployment with Bun - no node_modules needed
-- **✅ Production Ready**: Passes 51/51 comprehensive tests covering all Prisma operations
+- **✅ Production Ready**: Passes 54/54 comprehensive tests covering all Prisma operations
 - **📦 Fully Compatible**: Drop-in replacement for `@prisma/adapter-libsql` or `@prisma/adapter-better-sqlite3`
 
 ## Installation
 
 ```bash
 bun add prisma-adapter-bunsqlite
-# Note: Package not yet published - install from source for now
 ```
 
-Or install from source:
+### Install from Source (for development)
 
 ```bash
 git clone https://github.com/mmvsk/prisma-adapter-bunsqlite.git
@@ -260,7 +260,8 @@ const count = await prisma.$executeRaw`
 
 ```typescript
 // Use Unix timestamps instead of ISO8601
-const adapter = new PrismaBunSQLite("./dev.db", {
+const adapter = new PrismaBunSQLite({
+  url: "file:./dev.db",
   timestampFormat: "unixepoch-ms",
 });
 

@@ -8,6 +8,7 @@ node_modules
 out
 dist
 *.tgz
+/.dev
 
 # code coverage
 coverage
