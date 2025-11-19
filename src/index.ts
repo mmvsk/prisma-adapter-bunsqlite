@@ -1,10 +1,10 @@
 // Main exports for prisma-adapter-bunsqlite
 export {
-	PrismaBunSQLite,
+	PrismaBunSqlite,
 	BunSQLiteAdapter,
 	createBunSQLiteAdapter,
-	type PrismaBunSQLiteConfig,
-	type PrismaBunSQLiteOptions,
+	type PrismaBunSqliteConfig,
+	type PrismaBunSqliteOptions,
 } from "./bunsqlite-adapter";
 
 // Migration utilities (v0.2.0+)

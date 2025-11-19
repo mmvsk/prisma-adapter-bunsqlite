@@ -21,7 +21,7 @@ This is a production-ready Prisma driver adapter for Bun's native SQLite API (`b
 - **⚡ Programmatic Migrations** - Run migrations from TypeScript for :memory: testing
 - **🧪 Lightning Fast Tests** - Create fresh :memory: databases with migrations in milliseconds
 - **📦 Standalone Binaries** - Embed migrations in Bun binaries with zero runtime dependencies
-- **🎯 Type System Cleanup** - Consistent naming (`PrismaBunSQLiteOptions`)
+- **🎯 Type System Cleanup** - Consistent naming (`PrismaBunSqliteOptions`)
 - **✨ Test Suite Simplification** - Cleaner structure (77 tests total)
 
 ## Quick Links
@@ -39,7 +39,7 @@ This is a production-ready Prisma driver adapter for Bun's native SQLite API (`b
 - `tests/shadow-database.test.ts` - Shadow DB tests (9 tests)
 
 **Key Classes**:
-- `PrismaBunSQLite` - Factory class implementing `SqlMigrationAwareDriverAdapterFactory`
+- `PrismaBunSqlite` - Factory class implementing `SqlMigrationAwareDriverAdapterFactory`
 - `BunSQLiteAdapter` - Main adapter implementing `SqlDriverAdapter`
 - `BunSQLiteQueryable` - Base class with query/execute methods
 - `BunSQLiteTransaction` - Transaction handling
@@ -144,7 +144,7 @@ bunx prisma migrate dev --name your_migration_name
 The factory class implements `SqlMigrationAwareDriverAdapterFactory`:
 
 ```typescript
-export class PrismaBunSQLite implements SqlMigrationAwareDriverAdapterFactory {
+export class PrismaBunSqlite implements SqlMigrationAwareDriverAdapterFactory {
   async connectToShadowDb(): Promise<SqlDriverAdapter> {
     const shadowUrl = this.config.shadowDatabaseUrl ?? ":memory:";
     const db = this.createConnection(shadowUrl);
@@ -242,7 +242,7 @@ PRAGMA journal_mode = WAL       // Write-Ahead Logging (only for file-based DBs,
 **Factory Configuration:**
 
 ```typescript
-const adapter = new PrismaBunSQLite({
+const adapter = new PrismaBunSqlite({
   url: "file:./dev.db",
   shadowDatabaseUrl: ":memory:",  // Optional, defaults to :memory:
   safeIntegers: true,              // Optional, defaults to true

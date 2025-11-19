@@ -7,7 +7,7 @@
  * Result: Single binary with NO node_modules required!
  */
 
-import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
+import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 import { PrismaClient } from "@prisma/client";
 
 // Embed migrations as strings (can also use Bun.file() for external files)
@@ -104,7 +104,7 @@ async function main() {
   const dbPath = new URL("./app.db", import.meta.url).pathname;
 
   // Create adapter
-  const factory = new PrismaBunSQLite({ url: `file:${dbPath}` });
+  const factory = new PrismaBunSqlite({ url: `file:${dbPath}` });
   const adapter = await factory.connect();
 
   // Run embedded migrations

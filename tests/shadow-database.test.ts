@@ -3,11 +3,11 @@
  */
 
 import { test, expect, describe } from "bun:test";
-import { PrismaBunSQLite } from "../src/bunsqlite-adapter";
+import { PrismaBunSqlite } from "../src/bunsqlite-adapter";
 
 describe("Shadow Database Support", () => {
 	test("factory implements SqlMigrationAwareDriverAdapterFactory", () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 
 		// Check that connectToShadowDb method exists
 		expect(typeof factory.connectToShadowDb).toBe("function");
@@ -15,7 +15,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("connectToShadowDb creates separate adapter instance", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 
 		const mainAdapter = await factory.connect();
 		const shadowAdapter = await factory.connectToShadowDb();
@@ -33,7 +33,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("shadow database defaults to :memory:", async () => {
-		const factory = new PrismaBunSQLite({ url: "file:./test-main.db" });
+		const factory = new PrismaBunSqlite({ url: "file:./test-main.db" });
 
 		const shadowAdapter = await factory.connectToShadowDb();
 
@@ -51,7 +51,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("shadow database can use custom URL", async () => {
-		const factory = new PrismaBunSQLite({
+		const factory = new PrismaBunSqlite({
 			url: "file:./test-main.db",
 			shadowDatabaseUrl: ":memory:", // Explicit :memory:
 		});
@@ -72,7 +72,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("shadow database is isolated from main database", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 
 		const mainAdapter = await factory.connect();
 		const shadowAdapter = await factory.connectToShadowDb();
@@ -112,7 +112,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("shadow database supports executeScript for migrations", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const shadowAdapter = await factory.connectToShadowDb();
 
 		// Run migration script
@@ -148,7 +148,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("shadow database can be used multiple times", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 
 		// Connect to shadow DB multiple times
 		const shadow1 = await factory.connectToShadowDb();
@@ -170,7 +170,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("shadow database inherits safeIntegers config", async () => {
-		const factory = new PrismaBunSQLite({
+		const factory = new PrismaBunSqlite({
 			url: ":memory:",
 			safeIntegers: true,
 		});
@@ -200,7 +200,7 @@ describe("Shadow Database Support", () => {
 	});
 
 	test("shadow database inherits timestampFormat config", async () => {
-		const factory = new PrismaBunSQLite({
+		const factory = new PrismaBunSqlite({
 			url: ":memory:",
 			timestampFormat: "iso8601",
 		});

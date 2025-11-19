@@ -19,7 +19,7 @@ const ADAPTER_NAME = "@prisma/adapter-bunsqlite";
  * Runtime options for BunSQLite adapter
  * These options control how data is converted between SQLite and Prisma formats
  */
-export type PrismaBunSQLiteOptions = {
+export type PrismaBunSqliteOptions = {
 	/**
 	 * How to format DateTime values in the database
 	 * @default "iso8601"
@@ -212,7 +212,7 @@ function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
  * Maps arguments from Prisma format to SQLite format
  * Matches the official Prisma better-sqlite3 adapter argument handling
  */
-function mapArg(arg: unknown, argType: ArgType, options?: PrismaBunSQLiteOptions): unknown {
+function mapArg(arg: unknown, argType: ArgType, options?: PrismaBunSqliteOptions): unknown {
 	if (arg === null) {
 		return null;
 	}
@@ -412,7 +412,7 @@ function convertDriverError(error: any): any {
 class BunSQLiteQueryable {
 	constructor(
 		protected db: Database,
-		protected adapterOptions?: PrismaBunSQLiteOptions,
+		protected adapterOptions?: PrismaBunSqliteOptions,
 	) {}
 
 	readonly provider = "sqlite" as const;
@@ -559,7 +559,7 @@ class BunSQLiteTransaction extends BunSQLiteQueryable implements Transaction {
 	constructor(
 		db: Database,
 		readonly options: TransactionOptions,
-		adapterOptions: PrismaBunSQLiteOptions | undefined,
+		adapterOptions: PrismaBunSqliteOptions | undefined,
 		private onComplete: () => void,
 	) {
 		super(db, adapterOptions);
@@ -626,7 +626,7 @@ class AsyncMutex {
 export class BunSQLiteAdapter extends BunSQLiteQueryable implements SqlDriverAdapter {
 	private transactionMutex = new AsyncMutex();
 
-	constructor(db: Database, adapterOptions?: PrismaBunSQLiteOptions) {
+	constructor(db: Database, adapterOptions?: PrismaBunSqliteOptions) {
 		super(db, adapterOptions);
 	}
 
@@ -707,7 +707,7 @@ export function createBunSQLiteAdapter(db: Database): SqlDriverAdapter {
 /**
  * Configuration options for BunSQLite adapter
  */
-export type PrismaBunSQLiteConfig = {
+export type PrismaBunSqliteConfig = {
 	/**
 	 * Database URL (file path or :memory:)
 	 * Examples: "file:./dev.db", "file:/absolute/path/db.sqlite", ":memory:"
@@ -720,19 +720,19 @@ export type PrismaBunSQLiteConfig = {
 	 * Examples: "file:./shadow.db", ":memory:"
 	 */
 	shadowDatabaseUrl?: string;
-} & PrismaBunSQLiteOptions;
+} & PrismaBunSqliteOptions;
 
 /**
  * BunSQLite adapter factory for Prisma Client
  * Implements SqlMigrationAwareDriverAdapterFactory for shadow database support
  */
-export class PrismaBunSQLite implements SqlMigrationAwareDriverAdapterFactory {
+export class PrismaBunSqlite implements SqlMigrationAwareDriverAdapterFactory {
 	readonly provider = "sqlite" as const;
 	readonly adapterName = ADAPTER_NAME;
 
-	private config: PrismaBunSQLiteConfig;
+	private config: PrismaBunSqliteConfig;
 
-	constructor(config: PrismaBunSQLiteConfig) {
+	constructor(config: PrismaBunSqliteConfig) {
 		this.config = config;
 	}
 

@@ -39,7 +39,7 @@ This adapter implements Prisma's `SqlDriverAdapter` interface for Bun's native `
              │ SqlDriverAdapter Interface
              │
 ┌────────────▼────────────────────────┐
-│   PrismaBunSQLite (Factory)         │
+│   PrismaBunSqlite (Factory)         │
 │   - Creates adapter instance        │
 │   - Configures SQLite PRAGMAs       │
 └────────────┬────────────────────────┘
@@ -72,7 +72,7 @@ BunSQLiteQueryable (base class)
 ├── BunSQLiteAdapter (main adapter)
 └── BunSQLiteTransaction (transaction handler)
 
-PrismaBunSQLite (factory)
+PrismaBunSqlite (factory)
 ```
 
 ## Implementation Details
@@ -134,7 +134,7 @@ import {
 The `mapArg()` function (lines 201-256) converts Prisma types to SQLite types:
 
 ```typescript
-function mapArg(arg: unknown, argType: ArgType, options?: PrismaBunSQLiteOptions)
+function mapArg(arg: unknown, argType: ArgType, options?: PrismaBunSqliteOptions)
 ```
 
 **Key Conversions:**
@@ -353,10 +353,10 @@ async executeScript(script: string): Promise<void> {
 
 ### 8. Factory Pattern
 
-The `PrismaBunSQLite` factory (lines 588-611):
+The `PrismaBunSqlite` factory (lines 588-611):
 
 ```typescript
-export class PrismaBunSQLite {
+export class PrismaBunSqlite {
   readonly provider = "sqlite" as const;
   readonly adapterName = "@prisma/adapter-bunsqlite";
 
@@ -456,7 +456,7 @@ JavaScript numbers can't safely represent integers beyond `Number.MAX_SAFE_INTEG
 Enable `safeIntegers: true` by default:
 
 ```typescript
-export type PrismaBunSQLiteOptions = {
+export type PrismaBunSqliteOptions = {
   /**
    * Enable safe 64-bit integer handling.
    * When true, BIGINT columns return as BigInt instead of number,
@@ -526,7 +526,7 @@ const declaredTypes = (stmt as any).declaredTypes || [];
 The factory class now implements `SqlMigrationAwareDriverAdapterFactory`:
 
 ```typescript
-export class PrismaBunSQLite implements SqlMigrationAwareDriverAdapterFactory {
+export class PrismaBunSqlite implements SqlMigrationAwareDriverAdapterFactory {
   async connectToShadowDb(): Promise<SqlDriverAdapter> {
     // Defaults to :memory: for speed
     const shadowUrl = this.config.shadowDatabaseUrl ?? ":memory:";
@@ -602,20 +602,20 @@ CREATE TABLE _prisma_migrations (
 **Before (v0.1.x):**
 ```typescript
 export type PrismaBunSqlite3Options = { ... }  // Inconsistent naming
-export type PrismaBunSQLiteConfig = { ... }
+export type PrismaBunSqliteConfig = { ... }
 ```
 
 **After (v0.2.0):**
 ```typescript
-export type PrismaBunSQLiteOptions = { ... }   // Consistent naming
-export type PrismaBunSQLiteConfig = {
+export type PrismaBunSqliteOptions = { ... }   // Consistent naming
+export type PrismaBunSqliteConfig = {
   url: string;
   shadowDatabaseUrl?: string;  // New!
-} & PrismaBunSQLiteOptions;
+} & PrismaBunSqliteOptions;
 ```
 
 **Changes:**
-- Renamed `PrismaBunSqlite3Options` → `PrismaBunSQLiteOptions` (consistent with class name)
+- Renamed `PrismaBunSqlite3Options` → `PrismaBunSqliteOptions` (consistent with class name)
 - Added `shadowDatabaseUrl` to config
 - Better JSDoc comments throughout
 - All TypeScript strict mode errors fixed
@@ -791,7 +791,7 @@ db.run("COMMIT");
 
 ### 5. Why Options Support?
 
-**Decision**: Add `PrismaBunSQLiteOptions` with `timestampFormat`
+**Decision**: Add `PrismaBunSqliteOptions` with `timestampFormat`
 
 **Reasoning**:
 - Matches official adapter API
@@ -814,7 +814,7 @@ src/
 │   ├── BunSQLiteQueryable (Base)
 │   ├── BunSQLiteTransaction
 │   ├── BunSQLiteAdapter
-│   └── PrismaBunSQLite Factory
+│   └── PrismaBunSqlite Factory
 ├── migrations.ts           # Migration utilities (v0.2.0+)
 │   ├── runMigrations()
 │   ├── createTestDatabase()

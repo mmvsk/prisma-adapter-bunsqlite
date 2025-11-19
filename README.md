@@ -5,14 +5,15 @@ A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/a
 [![npm version](https://img.shields.io/npm/v/prisma-adapter-bunsqlite)](https://www.npmjs.com/package/prisma-adapter-bunsqlite)
 [![Tests](https://img.shields.io/badge/tests-77%2F77%20passing-success)](./tests)
 [![Bun](https://img.shields.io/badge/bun-v1.3.2+-black)](https://bun.sh)
-[![Prisma](https://img.shields.io/badge/prisma-6.19.0+-blue)](https://prisma.io)
+[![Prisma](https://img.shields.io/badge/prisma-7.0.0+-blue)](https://prisma.io)
 
-## ✨ What's New in v0.2.0
+## ✨ What's New in v0.3.0
 
-- **🔄 Shadow Database Support** - Full `prisma migrate dev` compatibility with shadow database
-- **⚡ Programmatic Migrations** - Run migrations from TypeScript for :memory: testing
-- **🧪 Lightning Fast Tests** - Create fresh :memory: databases with migrations in milliseconds
-- **📦 Standalone Binaries** - Embed migrations in Bun binaries with zero runtime dependencies
+- **🎯 Prisma 7 Support** - Full compatibility with Prisma ORM 7.0.0+ (Rust-free client)
+- **📦 Naming Convention** - Updated to `PrismaBunSqlite` (follows Prisma 7 standardized naming)
+- **⚡ Smaller Bundles** - ~90% smaller with Prisma 7's Rust-free architecture
+- **🔄 Shadow Database Support** - Full `prisma migrate dev` compatibility (v0.2.0+)
+- **💾 Programmatic Migrations** - Run migrations from TypeScript for :memory: testing (v0.2.0+)
 
 [See full changelog →](./CHANGELOG.md)
 
@@ -46,15 +47,15 @@ bun install
 ```prisma
 // prisma/schema.prisma
 generator client {
-  provider        = "prisma-client-js"
-  engineType      = "client"
-  runtime         = "bun"
-  previewFeatures = ["driverAdapters"]
+  provider   = "prisma-client"  // Updated for Prisma 7
+  engineType = "client"
+  runtime    = "bun"
+  output     = "./generated"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  // Note: In Prisma 7+, URL is passed via adapter in code, not here
 }
 
 model User {
@@ -74,10 +75,10 @@ bunx prisma generate
 
 ```typescript
 import { PrismaClient } from "@prisma/client";
-import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
+import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 
 // Create adapter instance
-const adapter = new PrismaBunSQLite({ url: "file:./dev.db" });
+const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
 
 // Initialize Prisma Client
 const prisma = new PrismaClient({ adapter });
@@ -95,20 +96,20 @@ console.log(user);
 
 ## API Reference
 
-### `PrismaBunSQLite`
+### `PrismaBunSqlite`
 
 Factory class for creating adapter instances.
 
 ```typescript
-import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
+import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 
-const adapter = new PrismaBunSQLite(config);
+const adapter = new PrismaBunSqlite(config);
 ```
 
 **Configuration:**
 
 ```typescript
-type PrismaBunSQLiteConfig = {
+type PrismaBunSqliteConfig = {
   url: string;                                    // Required: Database URL
   shadowDatabaseUrl?: string;                     // Optional: Shadow DB for migrations (default: ":memory:")
   timestampFormat?: "iso8601" | "unixepoch-ms";  // Optional: Default "iso8601"
@@ -122,26 +123,26 @@ type PrismaBunSQLiteConfig = {
 
 ```typescript
 // File-based database
-const adapter = new PrismaBunSQLite({ url: "file:./dev.db" });
+const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
 
 // In-memory database
-const adapter = new PrismaBunSQLite({ url: ":memory:" });
+const adapter = new PrismaBunSqlite({ url: ":memory:" });
 
 // With shadow database for migrations (v0.2.0+)
-const adapter = new PrismaBunSQLite({
+const adapter = new PrismaBunSqlite({
   url: "file:./dev.db",
   shadowDatabaseUrl: ":memory:"  // Fast shadow DB for migration testing
 });
 
 // With custom timestamp format
-const adapter = new PrismaBunSQLite({
+const adapter = new PrismaBunSqlite({
   url: "file:./dev.db",
   timestampFormat: "unixepoch-ms"
 });
 
 // With safe integers disabled (advanced use only)
 // Note: Disabling may cause precision loss for values > Number.MAX_SAFE_INTEGER
-const adapter = new PrismaBunSQLite({
+const adapter = new PrismaBunSqlite({
   url: "file:./dev.db",
   safeIntegers: false
 });
@@ -314,7 +315,7 @@ const count = await prisma.$executeRaw`
 
 ```typescript
 // Use Unix timestamps instead of ISO8601
-const adapter = new PrismaBunSQLite({
+const adapter = new PrismaBunSqlite({
   url: "file:./dev.db",
   timestampFormat: "unixepoch-ms",
 });
@@ -328,10 +329,10 @@ const prisma = new PrismaClient({ adapter });
 
 ```diff
 - import { PrismaLibSQL } from "@prisma/adapter-libsql";
-+ import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
++ import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 
 - const adapter = new PrismaLibSQL({ url: "file:./dev.db" });
-+ const adapter = new PrismaBunSQLite({ url: "file:./dev.db" });
++ const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
 
 const prisma = new PrismaClient({ adapter });
 ```
@@ -341,11 +342,11 @@ const prisma = new PrismaClient({ adapter });
 ```diff
 - import Database from "better-sqlite3";
 - import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-+ import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
++ import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 
 - const db = new Database("./dev.db");
 - const adapter = new PrismaBetterSqlite3(db);
-+ const adapter = new PrismaBunSQLite({ url: "file:./dev.db" });
++ const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
 
 const prisma = new PrismaClient({ adapter });
 ```

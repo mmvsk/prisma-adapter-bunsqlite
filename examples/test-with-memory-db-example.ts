@@ -13,7 +13,7 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { PrismaClient } from "@prisma/client";
 import { createTestDatabase, runMigrations, type Migration } from "../src/migrations";
-import { PrismaBunSQLite } from "../src/bunsqlite-adapter";
+import { PrismaBunSqlite } from "../src/bunsqlite-adapter";
 
 // Define your migrations
 const migrations: Migration[] = [
@@ -149,7 +149,7 @@ describe("User Management with :memory: database", () => {
 
 describe("Advanced: Manual migration control", () => {
 	test("can apply migrations manually for specific test scenarios", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		// Apply only the first migration
@@ -169,7 +169,7 @@ describe("Advanced: Manual migration control", () => {
 	});
 
 	test("can test migration rollback scenarios", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		// Apply initial migration

@@ -3,7 +3,7 @@
  */
 
 import { test, expect, describe } from "bun:test";
-import { PrismaBunSQLite } from "../src/bunsqlite-adapter";
+import { PrismaBunSqlite } from "../src/bunsqlite-adapter";
 import {
 	runMigrations,
 	getAppliedMigrations,
@@ -14,7 +14,7 @@ import {
 
 describe("Migration Utilities", () => {
 	test("runMigrations applies migrations to database", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const migrations: Migration[] = [
@@ -66,7 +66,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("runMigrations skips already applied migrations", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const migrations: Migration[] = [
@@ -93,7 +93,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("runMigrations tracks migrations in _prisma_migrations table", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const migrations: Migration[] = [
@@ -120,7 +120,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("runMigrations throws error on SQL failure", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const migrations: Migration[] = [
@@ -142,7 +142,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("getAppliedMigrations returns list of applied migrations", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		// Initially empty
@@ -167,7 +167,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("getPendingMigrations returns unapplied migrations", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const allMigrations: Migration[] = [
@@ -238,7 +238,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("migrations work with complex SQL including comments", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const migrations: Migration[] = [
@@ -276,7 +276,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("multiple migration runs are idempotent", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const migrations: Migration[] = [
@@ -299,7 +299,7 @@ describe("Migration Utilities", () => {
 	});
 
 	test("migrations preserve foreign key constraints", async () => {
-		const factory = new PrismaBunSQLite({ url: ":memory:" });
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
 		const adapter = await factory.connect();
 
 		const migrations: Migration[] = [

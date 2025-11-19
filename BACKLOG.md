@@ -55,7 +55,7 @@ This document tracks future improvements, enhancements, and optimizations for `p
 **Status**: ✅ **COMPLETED** in v0.2.0
 
 **What was fixed**:
-- ✅ Renamed `PrismaBunSqlite3Options` → `PrismaBunSQLiteOptions` (consistent naming)
+- ✅ Renamed `PrismaBunSqlite3Options` → `PrismaBunSqliteOptions` (consistent naming)
 - ✅ Simplified type structure (Options vs Config is now clear)
 - ✅ Added better JSDoc comments
 - ✅ All TypeScript errors fixed
@@ -216,7 +216,7 @@ src/
  *
  * @example
  * ```typescript
- * const adapter = new PrismaBunSQLite({ url: "file:./dev.db" });
+ * const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
  * const prisma = new PrismaClient({ adapter });
  * ```
  *
@@ -402,7 +402,7 @@ class BunSQLiteAdapter {
 
 **Proposal**:
 ```typescript
-new PrismaBunSQLite({
+new PrismaBunSqlite({
   url: "file:./dev.db",
   pragmas: {
     foreignKeys: true,      // default: true

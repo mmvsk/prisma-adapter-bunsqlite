@@ -9,9 +9,9 @@
  * @example
  * ```typescript
  * import { runMigrations } from "prisma-adapter-bunsqlite/migrations";
- * import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
+ * import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
  *
- * const adapter = await new PrismaBunSQLite({ url: ":memory:" }).connect();
+ * const adapter = await new PrismaBunSqlite({ url: ":memory:" }).connect();
  * await runMigrations(adapter, [
  *   { name: "init", sql: "CREATE TABLE users (id INTEGER PRIMARY KEY);" }
  * ]);
@@ -78,7 +78,7 @@ const MIGRATION_TABLE_SQL = `
  *
  * @example Basic usage
  * ```typescript
- * const adapter = await new PrismaBunSQLite({ url: ":memory:" }).connect();
+ * const adapter = await new PrismaBunSqlite({ url: ":memory:" }).connect();
  *
  * await runMigrations(adapter, [
  *   {
@@ -318,9 +318,9 @@ export async function createTestDatabase(
 	migrations: Migration[],
 	config?: { safeIntegers?: boolean; timestampFormat?: "iso8601" | "unixepoch-ms" },
 ): Promise<SqlDriverAdapter> {
-	const { PrismaBunSQLite } = await import("./bunsqlite-adapter");
+	const { PrismaBunSqlite } = await import("./bunsqlite-adapter");
 
-	const factory = new PrismaBunSQLite({
+	const factory = new PrismaBunSqlite({
 		url: ":memory:",
 		...config,
 	});

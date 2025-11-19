@@ -11,7 +11,7 @@
  * Run: ./myapp
  */
 
-import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
+import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 import { PrismaClient } from "@prisma/client";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -141,7 +141,7 @@ async function main() {
   const dbPath = process.env.DATABASE_URL?.replace("file:", "") || "./app.db";
 
   // Create adapter
-  const factory = new PrismaBunSQLite({ url: `file:${dbPath}` });
+  const factory = new PrismaBunSqlite({ url: `file:${dbPath}` });
   const adapter = await factory.connect();
 
   // Apply embedded migrations

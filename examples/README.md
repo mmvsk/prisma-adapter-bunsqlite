@@ -165,9 +165,9 @@ You can also build a custom migration CLI:
 
 ```typescript
 // migrate.ts
-import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
+import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 
-const adapter = await new PrismaBunSQLite({ url: "file:./data.db" }).connect();
+const adapter = await new PrismaBunSqlite({ url: "file:./data.db" }).connect();
 
 const migrationSQL = await Bun.file("./migrations/001_init.sql").text();
 await adapter.executeScript(migrationSQL);
@@ -198,14 +198,14 @@ Full `prisma migrate dev` support with shadow database is now available!
 
 ```typescript
 // prisma.config.ts
-import { PrismaBunSQLite } from "prisma-adapter-bunsqlite";
+import { PrismaBunSqlite } from "prisma-adapter-bunsqlite";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
   engine: "js",
   experimental: { adapter: true },
   adapter: async () => {
-    return new PrismaBunSQLite({
+    return new PrismaBunSqlite({
       url: env("DATABASE_URL"),
       shadowDatabaseUrl: ":memory:",  // Fast shadow DB for migrations
     });
