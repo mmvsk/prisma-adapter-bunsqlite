@@ -13,7 +13,7 @@ import {
 	type TransactionOptions,
 } from "@prisma/driver-adapter-utils";
 
-const ADAPTER_NAME = "@prisma/adapter-bunsqlite";
+const ADAPTER_NAME = "prisma-adapter-bunsqlite";
 
 /**
  * Runtime options for BunSqlite adapter
@@ -217,56 +217,48 @@ function mapArg(arg: unknown, argType: ArgType, options?: PrismaBunSqliteOptions
 		return null;
 	}
 
-	// Parse string numbers to proper types
-	if (typeof arg === "string" && argType.scalarType === "int") {
-		return Number.parseInt(arg);
-	}
-
-	if (typeof arg === "string" && argType.scalarType === "float") {
-		return Number.parseFloat(arg);
-	}
-
-	if (typeof arg === "string" && argType.scalarType === "decimal") {
-		// This can lose precision, but SQLite does not have a native decimal type
-		return Number.parseFloat(arg);
-	}
-
-	if (typeof arg === "string" && argType.scalarType === "bigint") {
-		return BigInt(arg);
-	}
-
 	// SQLite does not natively support booleans - convert to 1/0
 	if (typeof arg === "boolean") {
 		return arg ? 1 : 0;
 	}
 
-	// Handle DateTime arguments
-	if (typeof arg === "string" && argType.scalarType === "datetime") {
-		arg = new Date(arg);
-	}
+	// Fast path: use switch statement for better performance
+	switch (argType.scalarType) {
+		case "int":
+			return typeof arg === "string" ? Number.parseInt(arg) : arg;
 
-	if (arg instanceof Date) {
-		const format = options?.timestampFormat ?? "iso8601";
-		switch (format) {
-			case "unixepoch-ms":
-				return arg.getTime();
-			case "iso8601":
-				return arg.toISOString().replace("Z", "+00:00");
-			default:
-				throw new Error(`Unknown timestamp format: ${format}`);
+		case "float":
+		case "decimal":
+			// Note: decimal can lose precision, but SQLite does not have a native decimal type
+			return typeof arg === "string" ? Number.parseFloat(arg) : arg;
+
+		case "bigint":
+			return typeof arg === "string" ? BigInt(arg) : arg;
+
+		case "datetime": {
+			// Convert string to Date if needed
+			const date = typeof arg === "string" ? new Date(arg) : arg;
+			if (date instanceof Date) {
+				const format = options?.timestampFormat ?? "iso8601";
+				return format === "unixepoch-ms"
+					? date.getTime()
+					: date.toISOString().replace("Z", "+00:00");
+			}
+			return date;
 		}
-	}
 
-	// Handle Bytes arguments
-	if (typeof arg === "string" && argType.scalarType === "bytes") {
-		return Buffer.from(arg, "base64");
-	}
+		case "bytes":
+			if (typeof arg === "string") {
+				return Buffer.from(arg, "base64");
+			}
+			if (Array.isArray(arg)) {
+				return Buffer.from(arg);
+			}
+			return arg;
 
-	if (Array.isArray(arg) && argType.scalarType === "bytes") {
-		return Buffer.from(arg);
+		default:
+			return arg;
 	}
-
-	return arg;
 }
 
 /**
@@ -423,11 +415,22 @@ class BunSqliteQueryable {
 	 */
 	async queryRaw(query: SqlQuery): Promise<SqlResultSet> {
 		try {
+			// Fast path: if no special types need conversion, skip mapping
+			const needsMapping = query.argTypes.some(
+				(t) =>
+					t &&
+					(t.scalarType === "datetime" ||
+						t.scalarType === "bytes" ||
+						t.scalarType === "boolean")
+			);
+
 			// Map arguments from Prisma format to SQLite format
-			const args = query.args.map((arg, i) => {
-				const argType = query.argTypes[i];
-				return argType ? mapArg(arg, argType, this.adapterOptions) : arg;
-			});
+			const args = needsMapping
+				? query.args.map((arg, i) => {
+						const argType = query.argTypes[i];
+						return argType ? mapArg(arg, argType, this.adapterOptions) : arg;
+				  })
+				: query.args;
 
 			// Prepare statement with parameters
 			const stmt = this.db.prepare(query.sql);
@@ -447,7 +450,8 @@ class BunSqliteQueryable {
 			const declaredTypes = (stmt as any).declaredTypes || [];
 
 			// Handle column count mismatch due to duplicate names
-			// If we have more values than columnNames, pad with generic names
+			// Only needed for queries with JOINs that have duplicate column names
+			// Skip this expensive check for simple queries
 			const firstRow = rowArrays[0];
 			if (firstRow && firstRow.length > columnNames.length) {
 				const actualColumnCount = firstRow.length;
@@ -491,11 +495,22 @@ class BunSqliteQueryable {
 	 */
 	async executeRaw(query: SqlQuery): Promise<number> {
 		try {
+			// Fast path: if no special types need conversion, skip mapping
+			const needsMapping = query.argTypes.some(
+				(t) =>
+					t &&
+					(t.scalarType === "datetime" ||
+						t.scalarType === "bytes" ||
+						t.scalarType === "boolean")
+			);
+
 			// Map arguments from Prisma format to SQLite format
-			const args = query.args.map((arg, i) => {
-				const argType = query.argTypes[i];
-				return argType ? mapArg(arg, argType, this.adapterOptions) : arg;
-			});
+			const args = needsMapping
+				? query.args.map((arg, i) => {
+						const argType = query.argTypes[i];
+						return argType ? mapArg(arg, argType, this.adapterOptions) : arg;
+				  })
+				: query.args;
 
 			const stmt = this.db.prepare(query.sql);
 			const result = stmt.run(...(args as any));
