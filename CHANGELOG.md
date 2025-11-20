@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2025-11-21
+
+### Changed
+
+- **Code Simplification & Optimization**
+  - Removed `needsMapping` conditional checks in queryRaw/executeRaw for cleaner code
+  - Cached `timestampFormat` at class level to eliminate repeated lookups
+  - Simplified `mapArg()` signature to accept timestampFormat directly
+  - Removed global flag from regex pattern (micro-optimization)
+  - ISO 8601 timestamps now use `Z` suffix instead of `+00:00` (both valid, simpler)
+
+### Documentation
+
+- **Fixed Prisma 7 Import Patterns**
+  - Corrected import statements to use generated client: `import { PrismaClient } from "./prisma/generated/client"`
+  - Fixed `prisma.config.ts` to use `env()` helper for datasource URL
+  - Updated schema examples to use correct relative output path
+
+---
+
 ## [0.4.0] - 2025-11-21
 
 ### Changed
@@ -157,7 +177,8 @@ bun add prisma-adapter-bun-sqlite@latest
 
 **3. Update Code:**
 ```diff
- import { PrismaClient } from "@prisma/client";
+-import { PrismaClient } from "@prisma/client";
++import { PrismaClient } from "./prisma/generated/client";
 -import { PrismaBunSQLite } from "prisma-adapter-bun-sqlite";
 +import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 

@@ -11,13 +11,14 @@ A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/a
 
 ## Why This Adapter?
 
-- **⚡ Fastest for Bun + SQLite**: 2.1x faster than alternatives with 100% test compatibility ([see benchmarks](https://github.com/mmvsk/prisma-adapter-bun-sqlite-benchmark))
 - **🚀 Zero Dependencies**: Uses Bun's native `bun:sqlite` - no Node.js packages or native binaries required
+- **⚙️ Production-Ready WAL Configuration**: Advanced WAL options for optimal write performance (synchronous modes, autocheckpoint, busy timeout)
 - **📦 Pure JavaScript Migrations**: Run migrations programmatically without shipping migration files or CLI tools (v0.2.0+)
 - **🎯 Single Binary Deployment**: Perfect for `bun build --compile` - embed everything in one executable
-- **✅ Production Ready**: Passes 90/90 comprehensive tests covering all Prisma operations
+- **✅ Fully Tested**: Passes 90/90 comprehensive tests covering all Prisma operations
 - **🔄 Full Migration Support**: Shadow database + programmatic migrations for seamless development and deployment
 - **📝 Fully Compatible**: Drop-in replacement for `@prisma/adapter-libsql` or `@prisma/adapter-better-sqlite3`
+- **⚡ Comparable Performance**: Similar performance to alternatives with superior feature set
 
 ## Installation
 
@@ -43,7 +44,7 @@ generator client {
   provider   = "prisma-client"  // Updated for Prisma 7
   engineType = "client"
   runtime    = "bun"
-  output     = "./generated"
+  output     = "./generated"  // Outputs to prisma/generated
 }
 
 datasource db {
@@ -67,7 +68,7 @@ bunx prisma generate
 ### 3. Use the Adapter
 
 ```typescript
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./prisma/generated/client";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 
 // Create adapter instance
@@ -106,18 +107,12 @@ bunx prisma migrate deploy   # ✅ Uses Rust engine
 **Configuration in `prisma.config.ts`:**
 
 ```typescript
-import { defineConfig } from "prisma/config";
+import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-  },
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL || "file:./prisma/dev.db"
-    }
-  }
+  migrations: { path: "prisma/migrations" },
+  datasource: { url: env("DATABASE_URL") }
 });
 ```
 
@@ -126,6 +121,9 @@ export default defineConfig({
 Your application code uses the **adapter** for all database operations:
 
 ```typescript
+import { PrismaClient } from "./prisma/generated/client";
+import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
+
 // Your application - uses adapter
 const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
 const prisma = new PrismaClient({ adapter });

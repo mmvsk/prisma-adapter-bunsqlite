@@ -130,7 +130,7 @@ export type PrismaBunSqliteOptions = {
 function mapDeclType(declType: string): ColumnType | null {
 	// Normalize: uppercase, trim, and remove length specifiers like (255)
 	const normalized = declType.toUpperCase().trim();
-	const baseType = normalized.replace(/\([^)]*\)/g, "").trim();
+	const baseType = normalized.replace(/\([^)]*\)/, "").trim();
 
 	switch (baseType) {
 		case "":
@@ -307,7 +307,7 @@ function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
  * Maps arguments from Prisma format to SQLite format
  * Matches the official Prisma better-sqlite3 adapter argument handling
  */
-function mapArg(arg: unknown, argType: ArgType, options?: PrismaBunSqliteOptions): unknown {
+function mapArg(arg: unknown, argType: ArgType, timestampFormat: "iso8601" | "unixepoch-ms"): unknown {
 	if (arg === null) {
 		return null;
 	}
@@ -334,10 +334,9 @@ function mapArg(arg: unknown, argType: ArgType, options?: PrismaBunSqliteOptions
 			// Convert string to Date if needed
 			const date = typeof arg === "string" ? new Date(arg) : arg;
 			if (date instanceof Date) {
-				const format = options?.timestampFormat ?? "iso8601";
-				return format === "unixepoch-ms"
+				return timestampFormat === "unixepoch-ms"
 					? date.getTime()
-					: date.toISOString().replace("Z", "+00:00");
+					: date.toISOString();
 			}
 			return date;
 		}
@@ -497,10 +496,14 @@ function convertDriverError(error: any): any {
  * Base queryable class for both adapter and transactions
  */
 class BunSqliteQueryable {
+	private readonly timestampFormat: "iso8601" | "unixepoch-ms";
+
 	constructor(
 		protected db: Database,
 		protected adapterOptions?: PrismaBunSqliteOptions,
-	) {}
+	) {
+		this.timestampFormat = adapterOptions?.timestampFormat ?? "iso8601";
+	}
 
 	readonly provider = "sqlite" as const;
 	readonly adapterName = ADAPTER_NAME;
@@ -513,22 +516,11 @@ class BunSqliteQueryable {
 		debug(`${tag} %O`, query);
 
 		try {
-			// Fast path: if no special types need conversion, skip mapping
-			const needsMapping = query.argTypes.some(
-				(t) =>
-					t &&
-					(t.scalarType === "datetime" ||
-						t.scalarType === "bytes" ||
-						t.scalarType === "boolean")
-			);
-
 			// Map arguments from Prisma format to SQLite format
-			const args = needsMapping
-				? query.args.map((arg, i) => {
-						const argType = query.argTypes[i];
-						return argType ? mapArg(arg, argType, this.adapterOptions) : arg;
-				  })
-				: query.args;
+			const args = query.args.map((arg, i) => {
+				const argType = query.argTypes[i];
+				return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
+			});
 
 			// Prepare statement with parameters
 			const stmt = this.db.prepare(query.sql);
@@ -596,22 +588,11 @@ class BunSqliteQueryable {
 		debug(`${tag} %O`, query);
 
 		try {
-			// Fast path: if no special types need conversion, skip mapping
-			const needsMapping = query.argTypes.some(
-				(t) =>
-					t &&
-					(t.scalarType === "datetime" ||
-						t.scalarType === "bytes" ||
-						t.scalarType === "boolean")
-			);
-
 			// Map arguments from Prisma format to SQLite format
-			const args = needsMapping
-				? query.args.map((arg, i) => {
-						const argType = query.argTypes[i];
-						return argType ? mapArg(arg, argType, this.adapterOptions) : arg;
-				  })
-				: query.args;
+			const args = query.args.map((arg, i) => {
+				const argType = query.argTypes[i];
+				return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
+			});
 
 			const stmt = this.db.prepare(query.sql);
 			const result = stmt.run(...(args as any));

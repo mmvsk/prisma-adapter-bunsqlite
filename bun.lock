@@ -14,7 +14,7 @@
         "typescript": "^6.0.0-dev.20251119",
       },
       "peerDependencies": {
-        "@prisma/client": ">=6.0.0",
+        "@prisma/client": ">=7.0.0",
         "bun-types": ">=1.3.0",
       },
       "optionalPeers": [
