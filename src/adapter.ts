@@ -516,11 +516,18 @@ class BunSqliteQueryable {
 		debug(`${tag} %O`, query);
 
 		try {
-			// Map arguments from Prisma format to SQLite format
-			const args = query.args.map((arg, i) => {
-				const argType = query.argTypes[i];
-				return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
-			});
+			// Fast path: if no special types need conversion, skip mapping
+			const needsMapping = query.argTypes.some(
+				(t) => t && (t.scalarType === "datetime" || t.scalarType === "bytes" || t.scalarType === "boolean")
+			);
+
+			// Map arguments from Prisma format to SQLite format (or reuse if no conversion needed)
+			const args = needsMapping
+				? query.args.map((arg, i) => {
+						const argType = query.argTypes[i];
+						return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
+				  })
+				: query.args;
 
 			// Use db.query() which caches compiled statements (vs db.prepare() which recompiles every time)
 			const stmt = this.db.query(query.sql);
@@ -588,11 +595,18 @@ class BunSqliteQueryable {
 		debug(`${tag} %O`, query);
 
 		try {
-			// Map arguments from Prisma format to SQLite format
-			const args = query.args.map((arg, i) => {
-				const argType = query.argTypes[i];
-				return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
-			});
+			// Fast path: if no special types need conversion, skip mapping
+			const needsMapping = query.argTypes.some(
+				(t) => t && (t.scalarType === "datetime" || t.scalarType === "bytes" || t.scalarType === "boolean")
+			);
+
+			// Map arguments from Prisma format to SQLite format (or reuse if no conversion needed)
+			const args = needsMapping
+				? query.args.map((arg, i) => {
+						const argType = query.argTypes[i];
+						return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
+				  })
+				: query.args;
 
 			// Use db.query() which caches compiled statements (vs db.prepare() which recompiles every time)
 			const stmt = this.db.query(query.sql);

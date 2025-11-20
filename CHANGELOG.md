@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.3] - 2025-11-21
+
+### Performance
+
+- **Fast-Path Argument Passthrough** ⚡
+  - Skip `.map()` when no datetime/bytes/boolean conversion needed
+  - Eliminates array allocation and type checking overhead for simple queries
+  - Expected improvement: 20-40% faster on write-heavy workloads with primitive types
+  - Targets the 2.8× gap on "Create single user" benchmark
+
+---
+
 ## [0.4.2] - 2025-11-21
 
 ### Performance
