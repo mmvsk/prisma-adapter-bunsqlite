@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.4] - 2025-11-23
+
+### Changed
+
+- Typescript dev dependency to 5.9.3
+
+### Documentation
+
+- **README.md** - Fixed usage example
+- **ARCHITECTURE.md** - Fixed some typos
+
+---
+
 ## [0.5.3] - 2025-11-23
 
 ### Changed

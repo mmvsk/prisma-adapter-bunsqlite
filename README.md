@@ -15,7 +15,7 @@ Reliable, fast, zero-dependency Prisma adapter for Bun's native SQLite.
 - **Zero dependencies** - Uses Bun's native `bun:sqlite`, no Node.js packages or native binaries
 - **Programmatic migrations** - Run migrations from TypeScript, perfect for `:memory:` testing
 - **Single binary deployment** - Works with `bun build --compile`, embed migrations in your executable
-- **Fastest** - [faster than alternatives](https://github.com/mmvsk/prisma-adapter-bun-sqlite-benchmark) with 100% correctness
+- **Fast** - [faster than alternatives](https://github.com/mmvsk/prisma-adapter-bun-sqlite-benchmark) with 100% correctness
 
 ## Installation
 
@@ -48,7 +48,7 @@ datasource db {
 **2. Use the adapter:**
 
 ```typescript
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./path/to/prisma/generated/client";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 
 const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
@@ -71,6 +71,9 @@ const users = await prisma.user.findMany();
 // Production configuration with WAL
 const adapter = new PrismaBunSqlite({
   url: "file:./prod.db",
+  safeIntegers: true,
+  timestampFormat: "iso8601",
+  shadowDatabaseUrl: ":memory:",
   wal: {
     enabled: true,
     synchronous: "NORMAL",  // 2-3x faster than FULL
@@ -123,8 +126,8 @@ Full support for all Prisma operations:
 Standard Prisma CLI works normally:
 
 ```bash
-bunx prisma migrate dev
-bunx prisma migrate deploy
+bunx --bun prisma migrate dev
+bunx --bun prisma migrate deploy
 ```
 
 ### Programmatic Migrations
@@ -218,7 +221,7 @@ MIT
 
 ## Links
 
-- [GitHub](https://github.com/mmvsk/prisma-adapter-bun-sqlite)
 - [npm](https://www.npmjs.com/package/prisma-adapter-bun-sqlite)
+- [GitHub](https://github.com/mmvsk/prisma-adapter-bun-sqlite)
 - [Changelog](./CHANGELOG.md)
 - [Benchmarks](https://github.com/mmvsk/benchmark-prisma-sqlite-adapter)

@@ -8,8 +8,8 @@ This adapter implements Prisma's `SqlDriverAdapter` interface for Bun's native `
 
 **Goals:**
 1. Zero dependencies - only Bun's native APIs
-2. Battle-tested - 131 tests including official Prisma scenarios
 3. Production-ready - proper error handling, type conversions, defensive defaults
+2. Battle-tested - 131 tests including official Prisma scenarios
 4. Fast - leverage Bun's native performance
 
 ## File Structure
@@ -140,26 +140,6 @@ The Rust engine uses `IMMEDIATE` to handle multiple connections. We have a mutex
 
 **Why ISO8601 default:**
 Human-readable, works with SQLite date functions. Users can opt into `unixepoch-ms` for performance.
-
-## Critical Fixes History
-
-### v0.1.1: Data Corruption Fix
-
-**Bug:** `stmt.all()` returns objects, losing duplicate column names in JOINs.
-
-```typescript
-// BEFORE (buggy): SELECT u.id, p.id → { id: 10 } (lost u.id!)
-const rows = stmt.all(...args);
-
-// AFTER (fixed): SELECT u.id, p.id → [[5, 10]] (both preserved)
-const rows = stmt.values(...args);
-```
-
-### v0.1.1: Error Mapping Fix
-
-**Bug:** Bun returns `{ errno: 1, code: undefined }` for most errors.
-
-**Fix:** Added complete errno→code mapping table.
 
 ## Migration Utilities
 
