@@ -26,16 +26,25 @@ export class AsyncMutex {
 		// If not locked, acquire immediately
 		if (!this.locked) {
 			this.locked = true;
-			return () => this.release();
+			return this.createReleaser();
 		}
 
 		// Otherwise, wait in queue
 		return new Promise<() => void>((resolve) => {
 			this.queue.push(() => {
 				this.locked = true;
-				resolve(() => this.release());
+				resolve(this.createReleaser());
 			});
 		});
+	}
+
+	private createReleaser(): () => void {
+		let called = false;
+		return () => {
+			if (called) return;
+			called = true;
+			this.release();
+		};
 	}
 
 	private release(): void {
