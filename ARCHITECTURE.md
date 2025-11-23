@@ -9,7 +9,7 @@ This adapter implements Prisma's `SqlDriverAdapter` interface for Bun's native `
 **Goals:**
 1. Zero dependencies - only Bun's native APIs
 3. Production-ready - proper error handling, type conversions, defensive defaults
-2. Battle-tested - 131 tests including official Prisma scenarios
+2. Battle-tested - 136 tests including official Prisma scenarios
 4. Fast - leverage Bun's native performance
 
 ## File Structure
@@ -96,7 +96,20 @@ async startTransaction(): Promise<Transaction> {
 
 ### Column Type Detection
 
-We use `stmt.declaredTypes` and `stmt.columnNames` (Bun's undocumented APIs) to get column metadata.
+We use Bun's Statement metadata APIs (available since Bun 1.2.17):
+
+| API | Availability | Returns | Use Case |
+|-----|--------------|---------|----------|
+| `stmt.columnNames` | Pre-execution | `string[]` | Column names for result mapping |
+| `stmt.declaredTypes` | Pre-execution | `(string \| null)[]` | Schema types (e.g., "INTEGER", "TEXT") |
+| `stmt.columnTypes` | Post-execution | `(string \| null)[]` | Runtime types for computed columns |
+
+**Type resolution priority:**
+1. `declaredTypes` - Schema-based types (more specific: DATE vs DATETIME)
+2. `columnTypes` - Runtime types for computed columns (COUNT, expressions)
+3. Default to `Int32` as fallback
+
+**Caveat:** `stmt.columnTypes` throws for non-read-only statements (INSERT/UPDATE/DELETE with RETURNING). We handle this with a try-catch fallback to declared types only.
 
 **Why `stmt.values()` instead of `stmt.all()`:**
 - `stmt.all()` returns objects → duplicate column names (JOINs) cause data loss
@@ -159,10 +172,10 @@ tests/
 ├── general.test.ts           # Core adapter (57 tests)
 ├── migrations.test.ts        # Migration utilities (12 tests)
 ├── shadow-database.test.ts   # Shadow DB support (9 tests)
-├── wal-and-types.test.ts     # WAL + type tests (13 tests)
+├── wal-and-types.test.ts     # WAL + type tests (18 tests)
 └── official-scenarios.test.ts # Prisma official scenarios (40 tests)
 
-Total: 131 tests
+Total: 136 tests
 ```
 
 **Test sources:**
@@ -174,10 +187,10 @@ Total: 131 tests
 ## Known Limitations
 
 1. **Bun only** - Uses `bun:sqlite` native API
-2. **Local only** - No network support (use libsql for Turso)
-3. **Single writer** - SQLite limitation, mitigated by AsyncMutex
-4. **SERIALIZABLE only** - SQLite's only isolation level
-5. **Undocumented Bun APIs** - `stmt.columnNames`/`stmt.declaredTypes` (works reliably)
+2. **Bun 1.2.17+** - Requires `stmt.declaredTypes`/`stmt.columnTypes` (added in 1.2.17)
+3. **Local only** - No network support (use libsql for Turso)
+4. **Single writer** - SQLite limitation, mitigated by AsyncMutex
+5. **SERIALIZABLE only** - SQLite's only isolation level
 
 ## Non-Goals
 

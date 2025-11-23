@@ -11,7 +11,7 @@ Reliable, fast, zero-dependency Prisma adapter for Bun's native SQLite.
 
 ## Project Status
 
-**v0.5.3** - 131/131 tests passing
+**v0.5.3** - 136/136 tests passing
 
 ## File Structure
 
@@ -31,7 +31,7 @@ tests/
 ├── general.test.ts           # Core adapter (57 tests)
 ├── migrations.test.ts        # Migration utilities (12 tests)
 ├── shadow-database.test.ts   # Shadow DB (9 tests)
-├── wal-and-types.test.ts     # WAL + types (13 tests)
+├── wal-and-types.test.ts     # WAL + types (18 tests)
 └── official-scenarios.test.ts # Official Prisma scenarios (40 tests)
 ```
 
@@ -59,15 +59,21 @@ tests/
 ## Testing
 
 ```bash
-bun test                    # All 131 tests
+bun tsc --noEmit && bun test  # Typecheck + all 136 tests
 bun test tests/general.test.ts  # Core adapter only
 ```
 
 ## Development Workflow
 
 1. Edit source in `src/`
-2. Run `bun test`
-3. All 131 tests should pass
+2. Run `bun tsc --noEmit` to typecheck
+3. Run `bun test` to run all tests
+4. Both must pass before committing
+
+**Always run before committing:**
+```bash
+bun tsc --noEmit && bun test
+```
 
 ## Key Design Decisions
 

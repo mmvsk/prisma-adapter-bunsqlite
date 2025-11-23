@@ -483,3 +483,180 @@ describe("CHAR Type Support", () => {
 		await adapter.dispose();
 	});
 });
+
+describe("Runtime Column Type Detection (stmt.columnTypes)", () => {
+	let factory: PrismaBunSqlite;
+
+	beforeEach(() => {
+		factory = new PrismaBunSqlite({ url: ":memory:" });
+	});
+
+	test("should detect types for computed columns using runtime columnTypes", async () => {
+		const adapter = await factory.connect();
+
+		await adapter.executeScript(`
+      CREATE TABLE test_computed (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          price REAL NOT NULL
+      );
+      INSERT INTO test_computed (id, name, price) VALUES (1, 'apple', 1.50);
+      INSERT INTO test_computed (id, name, price) VALUES (2, 'banana', 0.75);
+    `);
+
+		// Query with computed columns (no declared types in schema)
+		const result = await adapter.queryRaw({
+			sql: `SELECT
+        COUNT(*) as total_count,
+        LENGTH(name) as name_length,
+        price * 2 as double_price,
+        id + 100 as offset_id
+      FROM test_computed`,
+			args: [],
+			argTypes: [],
+		});
+
+		expect(result.rows).toHaveLength(1);
+
+		// Runtime types: COUNT returns INTEGER, LENGTH returns INTEGER,
+		// arithmetic on REAL returns REAL, arithmetic on INTEGER returns INTEGER
+		// Int64 = 1, Double = 3
+		expect(result.columnTypes[0]).toBe(1); // COUNT(*) -> Int64 (runtime INTEGER)
+		expect(result.columnTypes[1]).toBe(1); // LENGTH() -> Int64 (runtime INTEGER)
+		expect(result.columnTypes[2]).toBe(3); // price * 2 -> Double (runtime REAL)
+		expect(result.columnTypes[3]).toBe(1); // id + 100 -> Int64 (runtime INTEGER)
+
+		await adapter.dispose();
+	});
+
+	test("should detect types for aggregate functions", async () => {
+		const adapter = await factory.connect();
+
+		await adapter.executeScript(`
+      CREATE TABLE test_aggregates (
+          id INTEGER PRIMARY KEY,
+          value REAL NOT NULL,
+          category TEXT NOT NULL
+      );
+      INSERT INTO test_aggregates VALUES (1, 10.5, 'A');
+      INSERT INTO test_aggregates VALUES (2, 20.5, 'A');
+      INSERT INTO test_aggregates VALUES (3, 30.0, 'B');
+    `);
+
+		const result = await adapter.queryRaw({
+			sql: `SELECT
+        SUM(value) as total,
+        AVG(value) as average,
+        MIN(value) as minimum,
+        MAX(value) as maximum,
+        COUNT(DISTINCT category) as categories
+      FROM test_aggregates`,
+			args: [],
+			argTypes: [],
+		});
+
+		expect(result.rows).toHaveLength(1);
+
+		// All aggregates on REAL columns return REAL (Double = 3)
+		// COUNT returns INTEGER (Int64 = 1)
+		expect(result.columnTypes[0]).toBe(3); // SUM -> Double
+		expect(result.columnTypes[1]).toBe(3); // AVG -> Double
+		expect(result.columnTypes[2]).toBe(3); // MIN -> Double
+		expect(result.columnTypes[3]).toBe(3); // MAX -> Double
+		expect(result.columnTypes[4]).toBe(1); // COUNT -> Int64
+
+		await adapter.dispose();
+	});
+
+	test("should handle INSERT...RETURNING gracefully (columnTypes not available)", async () => {
+		const adapter = await factory.connect();
+
+		await adapter.executeScript(`
+      CREATE TABLE test_returning (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+		// INSERT...RETURNING - columnTypes throws but we handle it gracefully
+		const result = await adapter.queryRaw({
+			sql: `INSERT INTO test_returning (name) VALUES (?) RETURNING id, name, created_at`,
+			args: ["test"],
+			argTypes: [{ scalarType: "string", arity: "scalar" }],
+		});
+
+		expect(result.rows).toHaveLength(1);
+
+		// Should fall back to declared types from schema
+		// Int32 = 0, Text = 7, DateTime = 10
+		expect(result.columnTypes[0]).toBe(0); // id -> Int32 (from declared INTEGER)
+		expect(result.columnTypes[1]).toBe(7); // name -> Text (from declared TEXT)
+		expect(result.columnTypes[2]).toBe(10); // created_at -> DateTime (from declared DATETIME)
+
+		await adapter.dispose();
+	});
+
+	test("should prefer declared types over runtime types when available", async () => {
+		const adapter = await factory.connect();
+
+		await adapter.executeScript(`
+      CREATE TABLE test_prefer_declared (
+          id INTEGER PRIMARY KEY,
+          event_date DATE NOT NULL,
+          event_time TIME NOT NULL
+      );
+      INSERT INTO test_prefer_declared VALUES (1, '2025-01-15', '14:30:00');
+    `);
+
+		const result = await adapter.queryRaw({
+			sql: `SELECT id, event_date, event_time FROM test_prefer_declared`,
+			args: [],
+			argTypes: [],
+		});
+
+		expect(result.rows).toHaveLength(1);
+
+		// Runtime would say TEXT for date/time, but declared types are more specific
+		// Int32 = 0, Date = 8, Time = 9
+		expect(result.columnTypes[0]).toBe(0); // INTEGER -> Int32
+		expect(result.columnTypes[1]).toBe(8); // DATE -> Date (not Text)
+		expect(result.columnTypes[2]).toBe(9); // TIME -> Time (not Text)
+
+		await adapter.dispose();
+	});
+
+	test("should handle mixed declared and computed columns", async () => {
+		const adapter = await factory.connect();
+
+		await adapter.executeScript(`
+      CREATE TABLE test_mixed (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          quantity INTEGER NOT NULL
+      );
+      INSERT INTO test_mixed VALUES (1, 'item', 5);
+    `);
+
+		const result = await adapter.queryRaw({
+			sql: `SELECT
+        id,                      -- declared: INTEGER
+        name,                    -- declared: TEXT
+        quantity * 2 as doubled, -- computed: no declared type
+        LENGTH(name) as len      -- computed: no declared type
+      FROM test_mixed`,
+			args: [],
+			argTypes: [],
+		});
+
+		expect(result.rows).toHaveLength(1);
+
+		// Int32 = 0, Text = 7, Int64 = 1
+		expect(result.columnTypes[0]).toBe(0); // id -> Int32 (declared INTEGER)
+		expect(result.columnTypes[1]).toBe(7); // name -> Text (declared TEXT)
+		expect(result.columnTypes[2]).toBe(1); // doubled -> Int64 (runtime INTEGER)
+		expect(result.columnTypes[3]).toBe(1); // len -> Int64 (runtime INTEGER)
+
+		await adapter.dispose();
+	});
+});

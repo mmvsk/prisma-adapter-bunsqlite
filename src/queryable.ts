@@ -2,7 +2,7 @@
  * Base queryable class for adapter and transactions
  */
 
-import { Database } from "bun:sqlite";
+import { Database, type SQLQueryBindings } from "bun:sqlite";
 import {
 	Debug,
 	DriverAdapterError,
@@ -52,8 +52,9 @@ export class BunSqliteQueryable {
 			const stmt = this.db.query(query.sql);
 
 			// Get column metadata first to determine if this is a returning query
-			const columnNames = (stmt as any).columnNames || [];
-			const declaredTypes = (stmt as any).declaredTypes || [];
+			// These properties are available pre-execution (Bun 1.2.17+)
+			const columnNames = stmt.columnNames?.slice() ?? [];
+			const declaredTypes = stmt.declaredTypes?.slice() ?? [];
 
 			// Check if this query returns columns (SELECT, INSERT...RETURNING, etc.)
 			// If no columns, use stmt.run() to get lastInsertRowid
@@ -76,7 +77,7 @@ export class BunSqliteQueryable {
 			// When queries have duplicate column names (e.g., SELECT u.id, p.id),
 			// stmt.all() returns objects which lose duplicate keys, causing data corruption.
 			// stmt.values() returns arrays preserving all columns in order.
-			const rowArrays = ((stmt as any).values(...(args as any)) as unknown[][] | null) ?? [];
+			const rowArrays = stmt.values(...(args as SQLQueryBindings[])) ?? [];
 
 			// Handle column count mismatch due to duplicate names
 			// Only needed for queries with JOINs that have duplicate column names
@@ -100,9 +101,18 @@ export class BunSqliteQueryable {
 				}
 			}
 
-			// Get column types using inference for computed columns
-			// This handles cases where declaredTypes is empty (COUNT, expressions, etc.)
-			const columnTypes = getColumnTypes(declaredTypes, rowArrays);
+			// Get runtime column types (available after execution, Bun 1.2.17+)
+			// This provides actual types for computed columns (COUNT, expressions, etc.)
+			// Note: columnTypes throws for non-read-only statements (INSERT...RETURNING, etc.)
+			let runtimeTypes: (string | null)[] = [];
+			try {
+				runtimeTypes = stmt.columnTypes?.slice() ?? [];
+			} catch {
+				// columnTypes not available for INSERT/UPDATE/DELETE with RETURNING
+			}
+
+			// Get column types, using runtime types for computed columns
+			const columnTypes = getColumnTypes(declaredTypes, runtimeTypes);
 
 			// If no results, return empty set with column metadata
 			if (rowArrays.length === 0) {

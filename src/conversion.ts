@@ -80,57 +80,54 @@ export function mapDeclType(declType: string): ColumnType | null {
 }
 
 /**
- * Infers column type from a value when declared type is not available
+ * Maps SQLite runtime type (from stmt.columnTypes) to Prisma ColumnType
+ * Runtime types are: INTEGER, REAL/FLOAT, TEXT, BLOB, NULL
  */
-export function inferColumnType(value: unknown): ColumnType {
-	switch (typeof value) {
-		case "string":
-			return ColumnTypeEnum.Text;
-		case "bigint":
+export function mapRuntimeType(runtimeType: string | null): ColumnType | null {
+	if (!runtimeType) return null;
+	switch (runtimeType.toUpperCase()) {
+		case "INTEGER":
 			return ColumnTypeEnum.Int64;
-		case "boolean":
-			return ColumnTypeEnum.Boolean;
-		case "number":
-			return ColumnTypeEnum.UnknownNumber;
-		case "object":
-			if (value instanceof ArrayBuffer || value instanceof Uint8Array || Buffer.isBuffer(value)) {
-				return ColumnTypeEnum.Bytes;
-			}
+		case "REAL":
+		case "FLOAT":
+			return ColumnTypeEnum.Double;
+		case "TEXT":
 			return ColumnTypeEnum.Text;
+		case "BLOB":
+			return ColumnTypeEnum.Bytes;
+		case "NULL":
+			return null;
 		default:
-			return ColumnTypeEnum.UnknownNumber;
+			return null;
 	}
 }
 
 /**
- * Gets column types array from declarations, inferring from data when needed
- * Uses .map() for efficient pre-allocated array creation
+ * Gets column types array from declarations, using runtime types for computed columns
+ * @param declaredTypes - Schema-based types from stmt.declaredTypes (null for computed columns)
+ * @param runtimeTypes - Runtime types from stmt.columnTypes (available after execution)
  */
-export function getColumnTypes(declaredTypes: string[], rows: unknown[][]): ColumnType[] {
-	const emptyIndices: number[] = [];
-
-	// Map declared types using .map() for pre-allocated array
-	const columnTypes = declaredTypes.map((declType, index) => {
-		const mappedType = declType ? mapDeclType(declType) : null;
-		if (mappedType === null) {
-			emptyIndices.push(index);
-			return ColumnTypeEnum.Int32; // Default
+export function getColumnTypes(
+	declaredTypes: (string | null)[],
+	runtimeTypes: (string | null)[],
+): ColumnType[] {
+	return declaredTypes.map((declType, index) => {
+		// First try declared type (more specific: DATE vs DATETIME, etc.)
+		if (declType) {
+			const mappedType = mapDeclType(declType);
+			if (mappedType !== null) return mappedType;
 		}
-		return mappedType;
+
+		// Fall back to runtime type for computed columns (COUNT, expressions, etc.)
+		const runtimeType = runtimeTypes[index];
+		if (runtimeType) {
+			const mappedRuntime = mapRuntimeType(runtimeType);
+			if (mappedRuntime !== null) return mappedRuntime;
+		}
+
+		// Default fallback
+		return ColumnTypeEnum.Int32;
 	});
-
-	// Infer types for columns with no declared type
-	for (const columnIndex of emptyIndices) {
-		for (const row of rows) {
-			const value = row[columnIndex];
-			if (value !== null) {
-				columnTypes[columnIndex] = inferColumnType(value);
-				break;
-			}
-		}
-	}
-
-	return columnTypes;
 }
 
 /**
