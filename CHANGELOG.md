@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.3] - 2025-11-23
+
+### Changed
+
+- **AsyncMutex** - Added double-release protection for defensive programming
+
+### Documentation
+
+- **ARCHITECTURE.md** - Added "Non-Goals" section explaining why connection pooling is not needed for `bun:sqlite`
+- **BACKLOG.md** - Cleaned up: removed encryption support (blocked by Bun), moved troubleshooting/FAQ to nice-to-have
+
+---
+
 ## [0.5.2] - 2025-11-23
 
 ### Fixed
