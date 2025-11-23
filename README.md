@@ -1,24 +1,21 @@
-# Prisma Adapter for Bun SQLite
+# prisma-adapter-bun-sqlite
 
-A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/api/sqlite) (`bun:sqlite`). Zero Node.js dependencies, optimized for Bun runtime.
+Reliable, fast, zero-dependency Prisma adapter for Bun's native SQLite.
 
-[![npm version](https://img.shields.io/npm/v/prisma-adapter-bun-sqlite)](https://www.npmjs.com/package/prisma-adapter-bun-sqlite)
-[![Tests](https://img.shields.io/badge/tests-131%2F131%20passing-success)](./tests)
-[![Bun](https://img.shields.io/badge/bun-v1.3.2+-black)](https://bun.sh)
-[![Prisma](https://img.shields.io/badge/prisma-7.0.0+-blue)](https://prisma.io)
-
-[See full changelog →](./CHANGELOG.md)
+[![npm](https://img.shields.io/npm/v/prisma-adapter-bun-sqlite)](https://www.npmjs.com/package/prisma-adapter-bun-sqlite)
+[![tests](https://img.shields.io/badge/tests-131%2F131-success)](./tests)
+[![bun](https://img.shields.io/badge/bun-1.0+-black)](https://bun.sh)
+[![prisma](https://img.shields.io/badge/prisma-6.0+-blue)](https://prisma.io)
 
 ## Why This Adapter?
 
-- **🚀 Zero Dependencies**: Uses Bun's native `bun:sqlite` - no Node.js packages or native binaries required
-- **⚙️ Production-Ready WAL Configuration**: Advanced WAL options for optimal write performance (synchronous modes, autocheckpoint, busy timeout)
-- **📦 Pure JavaScript Migrations**: Run migrations programmatically without shipping migration files or CLI tools (v0.2.0+)
-- **🎯 Single Binary Deployment**: Perfect for `bun build --compile` - embed everything in one executable
-- **✅ Fully Tested**: Passes 131/131 comprehensive tests covering all Prisma operations
-- **🔄 Full Migration Support**: Shadow database + programmatic migrations for seamless development and deployment
-- **📝 Fully Compatible**: Drop-in replacement for `@prisma/adapter-libsql` or `@prisma/adapter-better-sqlite3`
-- **⚡ Comparable Performance**: Similar performance to alternatives with superior feature set
+- **Fully-tested** - 131 tests including 40 scenarios ported from Prisma's official test suite
+- **Drop-in replacement** - Compatible with `@prisma/adapter-libsql` and `@prisma/adapter-better-sqlite3`
+- **Production-ready** - WAL mode, safe integers, proper error mapping to Prisma codes (P2002, P2003, etc.)
+- **Zero dependencies** - Uses Bun's native `bun:sqlite`, no Node.js packages or native binaries
+- **Programmatic migrations** - Run migrations from TypeScript, perfect for `:memory:` testing
+- **Single binary deployment** - Works with `bun build --compile`, embed migrations in your executable
+- **Fastest** - [faster than alternatives](https://github.com/mmvsk/benchmark-prisma-sqlite-adapter) with 100% correctness
 
 ## Installation
 
@@ -26,557 +23,203 @@ A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/a
 bun add prisma-adapter-bun-sqlite
 ```
 
-### Install from Source (for development)
-
-```bash
-git clone https://github.com/mmvsk/prisma-adapter-bun-sqlite.git
-cd prisma-adapter-bun-sqlite
-bun install
-```
-
 ## Quick Start
 
-### 1. Setup Prisma Schema
+**1. Configure Prisma schema:**
 
 ```prisma
 // prisma/schema.prisma
 generator client {
-  provider   = "prisma-client"  // Updated for Prisma 7
+  provider   = "prisma-client"
   engineType = "client"
   runtime    = "bun"
-  output     = "./generated"  // Outputs to prisma/generated
+
+  // Path of the generated code containing Prisma Client. Relative to the directory where sits schema.prisma
+  output     = "./generated"
 }
 
 datasource db {
   provider = "sqlite"
-  // Note: In Prisma 7+, URL is passed via adapter in code, not here
-}
-
-model User {
-  id    Int    @id @default(autoincrement())
-  email String @unique
-  name  String?
+  // Note: In Prisma 7+, the URL is passed via adapter in PrismaClient constructor
+  // See: https://pris.ly/d/prisma7-client-config
 }
 ```
 
-### 2. Generate Prisma Client
-
-```bash
-bunx prisma generate
-```
-
-### 3. Use the Adapter
+**2. Use the adapter:**
 
 ```typescript
-import { PrismaClient } from "./prisma/generated/client";
+import { PrismaClient } from "@prisma/client";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 
-// Create adapter instance
-const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
-
-// Initialize Prisma Client
-const prisma = new PrismaClient({ adapter });
-
-// Use Prisma normally
-const user = await prisma.user.create({
-  data: {
-    email: "alice@example.com",
-    name: "Alice",
-  },
-});
-
-console.log(user);
-```
-
-## 🔄 Migrations in Prisma 7
-
-**Important:** Prisma 7 separates CLI operations from runtime operations. Here's how it works:
-
-### CLI Migrations (Rust Engine)
-
-When you run migration commands, Prisma uses the **traditional Rust query engine** (not your adapter):
-
-```bash
-# These commands use prisma.config.ts datasource URL
-bunx prisma migrate dev      # ✅ Uses Rust engine
-bunx prisma db push          # ✅ Uses Rust engine
-bunx prisma db pull          # ✅ Uses Rust engine
-bunx prisma migrate deploy   # ✅ Uses Rust engine
-```
-
-**Configuration in `prisma.config.ts`:**
-
-```typescript
-import { defineConfig, env } from "prisma/config";
-
-export default defineConfig({
-  schema: "prisma/schema.prisma",
-  migrations: { path: "prisma/migrations" },
-  datasource: { url: env("DATABASE_URL") }
-});
-```
-
-### Runtime Queries (Your Adapter)
-
-Your application code uses the **adapter** for all database operations:
-
-```typescript
-import { PrismaClient } from "./prisma/generated/client";
-import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-
-// Your application - uses adapter
 const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
 const prisma = new PrismaClient({ adapter });
 
-await prisma.user.findMany(); // ✅ Uses your Bun adapter
+const users = await prisma.user.findMany();
 ```
 
-### Why This Architecture?
+## Configuration
 
-| Aspect | CLI (Rust Engine) | Runtime (Adapter) |
-|--------|------------------|------------------|
-| **Commands** | `migrate dev`, `db push` | Your app queries |
-| **Engine** | Traditional Rust | Rust-free JS compiler |
-| **Speed** | Standard | 3x faster |
-| **Bundle Size** | N/A (CLI only) | 90% smaller |
-| **Compatibility** | Works with Node | Optimized for Bun |
-
-### Standalone Deployments (No node_modules)
-
-For standalone binaries, use **programmatic migrations** (v0.2.0+):
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `url` | `string` | required | Database path (`file:./dev.db`) or `:memory:` |
+| `shadowDatabaseUrl` | `string` | `":memory:"` | Shadow DB for migrations |
+| `safeIntegers` | `boolean` | `true` | Prevent precision loss for BigInt |
+| `timestampFormat` | `"iso8601"` \| `"unixepoch-ms"` | `"iso8601"` | DateTime storage format |
+| `wal` | `boolean` \| `WalConfiguration` | `undefined` | WAL mode configuration |
 
 ```typescript
-import { createTestDatabase, loadMigrationsFromDir } from "prisma-adapter-bun-sqlite";
-
-// Load migrations at build time
-const migrations = await loadMigrationsFromDir("./prisma/migrations");
-
-// Apply to :memory: database (perfect for testing!)
-const adapter = await createTestDatabase(migrations);
-
-// Or apply to file database
-import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-const adapter = new PrismaBunSqlite({ url: "file:./app.db" });
-await runMigrations(adapter, migrations);
-```
-
-**See [examples/](./examples/) for complete standalone binary examples.**
-
----
-
-## API Reference
-
-### `PrismaBunSqlite`
-
-Factory class for creating adapter instances.
-
-```typescript
-import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-
-const adapter = new PrismaBunSqlite(config);
-```
-
-**Configuration:**
-
-```typescript
-type PrismaBunSqliteConfig = {
-  url: string;                                    // Required: Database URL
-  shadowDatabaseUrl?: string;                     // Optional: Shadow DB for migrations (default: ":memory:")
-  timestampFormat?: "iso8601" | "unixepoch-ms";  // Optional: Default "iso8601"
-  safeIntegers?: boolean;                         // Optional: Default true
-                                                   // Enable safe 64-bit integer handling
-                                                   // Prevents precision loss for BIGINT values
-  wal?: boolean | WalConfiguration;               // Optional: WAL mode configuration
-                                                   // true = enable with defaults
-                                                   // object = advanced configuration
-};
-
-type WalConfiguration = {
-  enabled: boolean;                               // Enable/disable WAL mode
-  synchronous?: "OFF" | "NORMAL" | "FULL" | "EXTRA";  // Sync mode (performance vs durability)
-  walAutocheckpoint?: number;                     // Pages before auto-checkpoint
-  busyTimeout?: number;                           // Lock timeout in milliseconds
-};
-```
-
-**Examples:**
-
-```typescript
-// File-based database
-const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
-
-// In-memory database
-const adapter = new PrismaBunSqlite({ url: ":memory:" });
-
-// With shadow database for migrations (v0.2.0+)
+// Production configuration with WAL
 const adapter = new PrismaBunSqlite({
-  url: "file:./dev.db",
-  shadowDatabaseUrl: ":memory:"  // Fast shadow DB for migration testing
-});
-
-// With custom timestamp format
-const adapter = new PrismaBunSqlite({
-  url: "file:./dev.db",
-  timestampFormat: "unixepoch-ms"
-});
-
-// With safe integers disabled (advanced use only)
-// Note: Disabling may cause precision loss for values > Number.MAX_SAFE_INTEGER
-const adapter = new PrismaBunSqlite({
-  url: "file:./dev.db",
-  safeIntegers: false
-});
-
-// With WAL mode enabled (simple)
-const adapter = new PrismaBunSqlite({
-  url: "file:./dev.db",
-  wal: true  // Enable WAL with default settings
-});
-
-// With advanced WAL configuration (production)
-const adapter = new PrismaBunSqlite({
-  url: "file:./dev.db",
+  url: "file:./prod.db",
   wal: {
     enabled: true,
-    synchronous: "NORMAL",      // 2-3x faster than FULL, still safe
-    walAutocheckpoint: 2000,    // Checkpoint every 2000 pages
-    busyTimeout: 10000          // 10 second lock timeout
-  }
+    synchronous: "NORMAL",  // 2-3x faster than FULL
+    busyTimeout: 10000,
+  },
 });
 ```
-
-### `BunSqliteAdapter`
-
-Low-level adapter class (advanced usage).
-
-```typescript
-import { Database } from "bun:sqlite";
-import { BunSqliteAdapter } from "prisma-adapter-bun-sqlite";
-
-const db = new Database("./dev.db");
-const adapter = new BunSqliteAdapter(db, options);
-```
-
-### Migration Utilities (v0.2.0+)
-
-Programmatic migration control for TypeScript-based workflows.
-
-```typescript
-import {
-  runMigrations,
-  createTestDatabase,
-  loadMigrationsFromDir,
-  getAppliedMigrations,
-  getPendingMigrations,
-} from "prisma-adapter-bun-sqlite";
-```
-
-**Quick Examples:**
-
-```typescript
-// Create :memory: database with migrations (perfect for tests!)
-const adapter = await createTestDatabase([
-  { name: "001_init", sql: "CREATE TABLE users (id INTEGER PRIMARY KEY);" }
-]);
-const prisma = new PrismaClient({ adapter });
-
-// Load and run migrations from filesystem
-const migrations = await loadMigrationsFromDir("./prisma/migrations");
-await runMigrations(adapter, migrations);
-
-// Check migration status
-const applied = await getAppliedMigrations(adapter);
-const pending = await getPendingMigrations(adapter, allMigrations);
-```
-
-**See [examples/](./examples/) for:**
-- Standalone binaries with embedded migrations
-- :memory: database testing patterns
-- Custom migration workflows
 
 ## Features
 
-### ✅ Comprehensive Prisma Support
+### Prisma Support
 
-- **CRUD Operations**: Create, read, update, delete, upsert
-- **Relations**: One-to-one, one-to-many, many-to-many with cascade deletes
-- **Filtering & Querying**: Where clauses, orderBy, pagination, distinct
-- **Aggregations**: Count, sum, avg, min, max, groupBy
-- **Transactions**: Interactive and sequential transactions with rollback
-- **Raw Queries**: `$queryRaw`, `$executeRaw`, `$queryRawUnsafe`
-- **Migrations**: Full schema migration support via `prisma migrate`
+Full support for all Prisma operations:
 
-### 🎯 Type Coercion
+- CRUD operations (create, read, update, delete, upsert)
+- Relations (one-to-one, one-to-many, many-to-many, cascades)
+- Filtering, ordering, pagination, distinct
+- Aggregations (count, sum, avg, min, max, groupBy)
+- Transactions (interactive and sequential)
+- Raw queries (`$queryRaw`, `$executeRaw`)
+- Migrations (`prisma migrate dev/deploy`)
 
-Automatic conversion between Prisma and SQLite types:
+### Type Conversions
 
-| Prisma Type | SQLite Type | Notes |
-|-------------|-------------|-------|
-| `String` | `TEXT` | UTF-8 encoded |
-| `Int` | `INTEGER` | 32-bit integers |
-| `BigInt` | `TEXT` | Stored as string (SQLite 64-bit limit) |
-| `Float` | `REAL` | Double precision |
-| `Decimal` | `TEXT` | Stored as string (no native decimal) |
-| `Boolean` | `INTEGER` | `0` = false, `1` = true |
-| `DateTime` | `TEXT` or `INTEGER` | ISO8601 string or Unix timestamp (ms) |
-| `Bytes` | `BLOB` | Binary data |
-| `Json` | `TEXT` | JSON string |
+| Prisma | SQLite | Notes |
+|--------|--------|-------|
+| `String` | `TEXT` | |
+| `Int` | `INTEGER` | 32-bit |
+| `BigInt` | `TEXT` | Safe integer handling |
+| `Float` | `REAL` | |
+| `Decimal` | `TEXT` | No native decimal in SQLite |
+| `Boolean` | `INTEGER` | 0/1 |
+| `DateTime` | `TEXT`/`INTEGER` | ISO8601 or Unix ms |
+| `Bytes` | `BLOB` | |
+| `Json` | `TEXT` | |
 
-### 🛡️ Error Handling
+### Error Mapping
 
-SQLite errors are automatically mapped to Prisma error codes:
-
-| SQLite Error | Prisma Error | Description |
-|--------------|--------------|-------------|
-| `SQLITE_CONSTRAINT_UNIQUE` | `P2002` | Unique constraint violation |
-| `SQLITE_CONSTRAINT_FOREIGNKEY` | `P2003` | Foreign key constraint violation |
-| `SQLITE_CONSTRAINT_NOTNULL` | `P2011` | Null constraint violation |
+| SQLite Error | Prisma Code | Description |
+|--------------|-------------|-------------|
+| `SQLITE_CONSTRAINT_UNIQUE` | P2002 | Unique violation |
+| `SQLITE_CONSTRAINT_FOREIGNKEY` | P2003 | Foreign key violation |
+| `SQLITE_CONSTRAINT_NOTNULL` | P2011 | Null violation |
 | `SQLITE_BUSY` | Timeout | Database locked |
 
-### ⚙️ Configuration
+## Migrations
 
-The adapter automatically configures optimal SQLite settings:
+### CLI Migrations
 
-```typescript
-// Applied on connection
-PRAGMA foreign_keys = ON        // Enable foreign key constraints
-PRAGMA busy_timeout = 5000      // 5 second lock timeout
-PRAGMA journal_mode = WAL       // Write-Ahead Logging for performance
+Standard Prisma CLI works normally:
+
+```bash
+bunx prisma migrate dev
+bunx prisma migrate deploy
 ```
 
-## Usage Examples
+### Programmatic Migrations
 
-### Basic CRUD
-
-```typescript
-// Create
-const user = await prisma.user.create({
-  data: { email: "bob@example.com", name: "Bob" },
-});
-
-// Read
-const users = await prisma.user.findMany({
-  where: { name: { contains: "Alice" } },
-  orderBy: { email: "asc" },
-});
-
-// Update
-await prisma.user.update({
-  where: { id: 1 },
-  data: { name: "Alice Smith" },
-});
-
-// Delete
-await prisma.user.delete({ where: { id: 1 } });
-```
-
-### Transactions
+Run migrations from TypeScript - perfect for testing and standalone binaries:
 
 ```typescript
-// Interactive transaction
-await prisma.$transaction(async (tx) => {
-  const user = await tx.user.create({
-    data: { email: "charlie@example.com" },
-  });
+import {
+  PrismaBunSqlite,
+  runMigrations,
+  loadMigrationsFromDir,
+  createTestDatabase
+} from "prisma-adapter-bun-sqlite";
 
-  await tx.post.create({
-    data: {
-      title: "My First Post",
-      authorId: user.id,
-    },
-  });
-});
+// Option 1: Load from filesystem
+const migrations = await loadMigrationsFromDir("./prisma/migrations");
+const factory = new PrismaBunSqlite({ url: "file:./app.db" });
+const adapter = await factory.connect();
+await runMigrations(adapter, migrations);
 
-// Sequential transaction
-await prisma.$transaction([
-  prisma.user.create({ data: { email: "dave@example.com" } }),
-  prisma.user.create({ data: { email: "eve@example.com" } }),
+// Option 2: In-memory database for tests (fast!)
+const adapter = await createTestDatabase([
+  { name: "001_init", sql: "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);" }
 ]);
+const prisma = new PrismaClient({ adapter });
 ```
 
-### Raw Queries
+### Standalone Binary
+
+Embed migrations in a single executable:
 
 ```typescript
-// Raw SELECT
-const users = await prisma.$queryRaw<User[]>`
-  SELECT * FROM User WHERE email LIKE ${"%.com"}
-`;
+// build.ts - compile with: bun build --compile ./build.ts
+import { PrismaBunSqlite, runMigrations } from "prisma-adapter-bun-sqlite";
+import { PrismaClient } from "@prisma/client";
 
-// Raw INSERT/UPDATE/DELETE
-const count = await prisma.$executeRaw`
-  UPDATE User SET name = ${"Anonymous"} WHERE name IS NULL
-`;
-```
+// Migrations embedded at build time
+const migrations = [
+  { name: "001_init", sql: "CREATE TABLE users (id INTEGER PRIMARY KEY);" }
+];
 
-### Custom Timestamp Format
-
-```typescript
-// Use Unix timestamps instead of ISO8601
-const adapter = new PrismaBunSqlite({
-  url: "file:./dev.db",
-  timestampFormat: "unixepoch-ms",
-});
+const factory = new PrismaBunSqlite({ url: "file:./app.db" });
+const adapter = await factory.connect();
+await runMigrations(adapter, migrations, { logger: () => {} });
 
 const prisma = new PrismaClient({ adapter });
+// Your app logic...
 ```
 
-## Migration from Other Adapters
+## Requirements
 
-### From `@prisma/adapter-libsql`
+| Requirement | Version |
+|-------------|---------|
+| Bun | >= 1.0.0 |
+| Prisma | >= 6.0.0 |
+| @prisma/driver-adapter-utils | >= 6.0.0 |
 
-```diff
-- import { PrismaLibSQL } from "@prisma/adapter-libsql";
-+ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
+### Runtime Support
 
-- const adapter = new PrismaLibSQL({ url: "file:./dev.db" });
-+ const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
-
-const prisma = new PrismaClient({ adapter });
-```
-
-### From `@prisma/adapter-better-sqlite3`
-
-```diff
-- import Database from "better-sqlite3";
-- import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-+ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-
-- const db = new Database("./dev.db");
-- const adapter = new PrismaBetterSqlite3(db);
-+ const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
-
-const prisma = new PrismaClient({ adapter });
-```
-
-## Testing
-
-Run the comprehensive test suite:
-
-```bash
-# Run all tests (131 tests total)
-bun test
-
-# Run specific test suites
-bun test tests/general.test.ts           # Core adapter tests (57)
-bun test tests/migrations.test.ts        # Migration utility tests (12)
-bun test tests/shadow-database.test.ts   # Shadow DB tests (9)
-bun test tests/wal-configuration.test.ts # WAL configuration tests (13)
-bun test tests/official-scenarios.test.ts # Official Prisma scenarios (40)
-
-# Run with verbose output
-bun test --verbose
-```
-
-Test coverage includes:
-- 57 **Core Adapter Tests** (CRUD, relations, transactions, types, errors)
-- 12 **Migration Utility Tests** (v0.2.0+)
-- 9 **Shadow Database Tests** (v0.2.0+)
-- 13 **WAL Configuration Tests** (v0.4.0+)
-- 40 **Official Prisma Scenario Tests** - ported from Prisma's official test suite and quaint engine
-
-## Performance
-
-The adapter is **the fastest Prisma SQLite adapter for Bun**, outperforming all alternatives:
-
-### Benchmark Results
-
-Comprehensive benchmarks comparing all available Prisma SQLite adapters for Bun:
-
-**[📊 Full Benchmark Results](https://github.com/mmvsk/prisma-adapter-bun-sqlite-benchmark)**
-
-| Adapter | Performance | Correctness | Status |
-|---------|-------------|-------------|--------|
-| **prisma-adapter-bun-sqlite** | **242 ops/sec** 🏆 | ✅ 26/26 (100%) | **Recommended** |
-| @prisma/adapter-libsql | 115 ops/sec (2.1x slower) | ✅ 26/26 (100%) | OK for Turso |
-| @abcx3/prisma-bun-adapter | 111 ops/sec (2.2x slower) | ❌ 7/26 (27%) | **Not Recommended** |
-
-**Key advantages:**
-- **2.1x faster** than @prisma/adapter-libsql on real disk workloads
-- **100% test compatibility** - all Prisma features work correctly
-- **Foreign keys enforced** - data integrity guaranteed
-- **Proper error handling** - Prisma error codes (P2002, P2003, etc.)
-
-### Technical Optimizations
-
-- **Native Bun API**: Direct calls to `bun:sqlite` (zero overhead)
-- **WAL Mode**: Write-Ahead Logging for better concurrency and performance
-- **Prepared Statements**: All queries use prepared statements for security and speed
-- **Safe Integers**: BigInt handling prevents precision loss
-- **Zero Dependencies**: No runtime overhead from external packages
-
-The benchmark suite includes 26 comprehensive tests covering CRUD, relations, transactions, aggregations, and more. See the [benchmark repository](https://github.com/mmvsk/prisma-adapter-bun-sqlite-benchmark) for detailed results and methodology.
-
-## Deployment
-
-### Bun Binary
-
-```bash
-# Build standalone executable
-bun build ./src/index.ts --compile --outfile myapp
-
-# Deploy single binary (no node_modules needed!)
-./myapp
-```
-
-### Docker
-
-```dockerfile
-FROM oven/bun:1.3.2
-
-WORKDIR /app
-COPY . .
-RUN bun install
-RUN bunx prisma generate
-
-CMD ["bun", "run", "src/index.ts"]
-```
+| Runtime | Support |
+|---------|---------|
+| Bun | ✅ |
+| Node.js | ❌ (use better-sqlite3 adapter) |
+| Browser | ❌ |
 
 ## Limitations
 
-- **SQLite Specific**: Only works with SQLite databases
-- **Single Writer**: SQLite limitation - one writer at a time (readers unlimited)
-- **No Network**: Pure local file-based database (use libsql for networked SQLite)
-- **Decimal Precision**: Decimals stored as TEXT (SQLite has no native decimal type)
+- **Bun only** - Requires Bun's native `bun:sqlite`
+- **SQLite only** - Not a PostgreSQL/MySQL adapter
+- **Single writer** - SQLite limitation (readers unlimited)
+- **Local only** - No network support (use libsql for Turso)
+- **SERIALIZABLE only** - SQLite's only isolation level
 
 ## Architecture
 
-For detailed implementation information, design decisions, and comparisons with the official Prisma adapters, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for implementation details, design decisions, and comparison with official Prisma adapters.
 
 ## Contributing
 
-Contributions welcome! Please read [ARCHITECTURE.md](./ARCHITECTURE.md) first to understand the implementation.
-
 ```bash
-# Setup
 git clone https://github.com/mmvsk/prisma-adapter-bun-sqlite.git
 cd prisma-adapter-bun-sqlite
 bun install
-
-# Run tests
 bun test
-
-# Generate Prisma Client
-bunx prisma generate
 ```
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) before contributing.
 
 ## License
 
 MIT
 
-## Credits
+## Links
 
-- Built with [Bun](https://bun.sh)
-- Follows patterns from [Prisma's official adapters](https://github.com/prisma/prisma/tree/main/packages/adapter-better-sqlite3)
-- Inspired by `@prisma/adapter-better-sqlite3` and `@prisma/adapter-libsql`
-
-## Related Projects
-
-- [@prisma/adapter-better-sqlite3](https://github.com/prisma/prisma/tree/main/packages/adapter-better-sqlite3) - Official adapter for better-sqlite3 (Node.js)
-- [@prisma/adapter-libsql](https://github.com/prisma/prisma/tree/main/packages/adapter-libsql) - Official adapter for libsql/turso
-- [bun:sqlite](https://bun.sh/docs/api/sqlite) - Bun's native SQLite API
-
-## Support
-
-- [GitHub Issues](https://github.com/mmvsk/prisma-adapter-bun-sqlite/issues)
-- [Prisma Discord](https://discord.gg/prisma)
-- [Bun Discord](https://bun.sh/discord)
+- [GitHub](https://github.com/mmvsk/prisma-adapter-bun-sqlite)
+- [npm](https://www.npmjs.com/package/prisma-adapter-bun-sqlite)
+- [Changelog](./CHANGELOG.md)
+- [Benchmarks](https://github.com/mmvsk/benchmark-prisma-sqlite-adapter)

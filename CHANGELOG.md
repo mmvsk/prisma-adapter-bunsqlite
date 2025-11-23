@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2025-11-23
+
+### Changed
+
+- **Modular File Structure** - Split single 1012-line `adapter.ts` into 8 focused modules:
+  - `types.ts` - Type definitions
+  - `errors.ts` - Error mapping
+  - `conversion.ts` - Type conversions
+  - `queryable.ts` - Base queryable class
+  - `transaction.ts` - Transaction + AsyncMutex
+  - `adapter.ts` - Main adapter class
+  - `factory.ts` - Factory class
+  - `migration.ts` - Migration utilities (renamed from `migrations.ts`)
+
+- **Always Coerce Argument Types** - Removed fast-path optimization that skipped `mapArg` for non-datetime/bytes/boolean types. Correctness over micro-optimization.
+
+- **Robust Column Metadata Handling** - Improved sync between `columnNames`, `declaredTypes`, and actual row data for edge cases.
+
+### Added
+
+- **131 Tests** - Up from 90, including 40 official Prisma scenarios ported from `prisma-engines/quaint`
+- **lastInsertId Support** - Now returned for INSERT/UPDATE/DELETE statements (matches libsql adapter)
+- **useTransaction Option** - For programmatic migrations with BEGIN/COMMIT/ROLLBACK
+
+### Documentation
+
+- Complete README rewrite - cleaner structure, reliability-first messaging
+- Simplified ARCHITECTURE.md - focused on key implementation details
+- Updated CLAUDE.md with new file structure
+
+---
+
 ## [0.4.3] - 2025-11-21
 
 ### Performance
