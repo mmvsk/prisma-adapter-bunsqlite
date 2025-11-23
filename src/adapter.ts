@@ -222,22 +222,20 @@ function inferColumnType(value: unknown): ColumnType {
 
 /**
  * Gets column types array from declarations, inferring from data when needed
+ * Uses .map() for efficient pre-allocated array creation
  */
 function getColumnTypes(declaredTypes: string[], rows: unknown[][]): ColumnType[] {
-	const columnTypes: ColumnType[] = [];
 	const emptyIndices: number[] = [];
 
-	// Map declared types
-	for (let i = 0; i < declaredTypes.length; i++) {
-		const declType = declaredTypes[i];
+	// Map declared types using .map() for pre-allocated array
+	const columnTypes = declaredTypes.map((declType, index) => {
 		const mappedType = declType ? mapDeclType(declType) : null;
 		if (mappedType === null) {
-			emptyIndices.push(i);
-			columnTypes[i] = ColumnTypeEnum.Int32; // Default
-		} else {
-			columnTypes[i] = mappedType;
+			emptyIndices.push(index);
+			return ColumnTypeEnum.Int32; // Default
 		}
-	}
+		return mappedType;
+	});
 
 	// Infer types for columns with no declared type
 	for (const columnIndex of emptyIndices) {
@@ -255,12 +253,14 @@ function getColumnTypes(declaredTypes: string[], rows: unknown[][]): ColumnType[
 
 /**
  * Maps a row of values from SQLite format to Prisma format
+ * Uses Array.from() for efficient pre-allocation, then modifies in-place
  */
 function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
-	const result: unknown[] = [];
+	// Pre-allocate array with correct size (more efficient than empty array + index assignment)
+	const result: unknown[] = Array.from(row);
 
-	for (let i = 0; i < row.length; i++) {
-		const value = row[i];
+	for (let i = 0; i < result.length; i++) {
+		const value = result[i];
 
 		// Handle BLOB/Bytes - convert to array of numbers
 		if (value instanceof ArrayBuffer) {
@@ -297,7 +297,7 @@ function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
 			continue;
 		}
 
-		result[i] = value;
+		// No transformation needed - value already in result from Array.from()
 	}
 
 	return result;
