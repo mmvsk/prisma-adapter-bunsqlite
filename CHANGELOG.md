@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.5] - 2025-11-24
+
+### Changed
+
+- **Column Type Detection** - Now uses Bun's official `stmt.columnTypes` API ([oven-sh/bun#20232](https://github.com/oven-sh/bun/pull/20232), Bun 1.2.17+) for runtime type detection on computed columns (COUNT, LENGTH, expressions), replacing value-based inference
+- **Type Safety** - Removed `(stmt as any)` casts for `columnNames`, `declaredTypes`, and `values()` - now properly typed
+
+### Added
+
+- **5 new tests** for runtime column type detection (136 total)
+  - Computed columns (COUNT, LENGTH, arithmetic expressions)
+  - Aggregate functions (SUM, AVG, MIN, MAX)
+  - INSERT...RETURNING graceful fallback
+  - Declared types priority over runtime types
+  - Mixed declared and computed columns
+
+### Documentation
+
+- **ARCHITECTURE.md** - Documented column type detection system with API table
+- **CLAUDE.md** - Added `bun tsc --noEmit` to development workflow
+
+---
+
 ## [0.5.4] - 2025-11-23
 
 ### Changed
