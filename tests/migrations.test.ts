@@ -3,14 +3,14 @@
  */
 
 import { test, expect, describe } from "bun:test";
-import { PrismaBunSqlite } from "../src/adapter";
 import {
+	PrismaBunSqlite,
 	runMigrations,
 	getAppliedMigrations,
 	getPendingMigrations,
 	createTestDatabase,
 	type Migration,
-} from "../src/migrations";
+} from "../src/index";
 
 describe("Migration Utilities", () => {
 	test("runMigrations applies migrations to database", async () => {

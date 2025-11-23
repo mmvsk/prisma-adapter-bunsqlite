@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { PrismaBunSqlite } from "../src/adapter";
+import { PrismaBunSqlite } from "../src/index";
 import { existsSync, unlinkSync } from "node:fs";
 
 describe("WAL Configuration", () => {

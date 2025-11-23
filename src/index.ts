@@ -1,11 +1,17 @@
 // Main exports for prisma-adapter-bun-sqlite
-export {
-	PrismaBunSqlite,
-	BunSqliteAdapter,
-	createBunSqliteAdapter,
-	type PrismaBunSqliteConfig,
-	type PrismaBunSqliteOptions,
-} from "./adapter";
+
+// Types
+export type {
+	WalConfiguration,
+	PrismaBunSqliteOptions,
+	PrismaBunSqliteConfig,
+} from "./types.js";
+
+// Factory (main entry point)
+export { PrismaBunSqlite } from "./factory.js";
+
+// Adapter
+export { BunSqliteAdapter, createBunSqliteAdapter } from "./adapter.js";
 
 // Migration utilities (v0.2.0+)
 export {
@@ -16,4 +22,4 @@ export {
 	createTestDatabase,
 	type Migration,
 	type MigrationOptions,
-} from "./migrations";
+} from "./migration.js";

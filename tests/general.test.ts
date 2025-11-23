@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { PrismaClient } from "@/prisma-generated/client";
-import { PrismaBunSqlite } from "../src/adapter";
+import { PrismaBunSqlite } from "../src/index";
 
 // Setup adapter and Prisma client
 const url = process.env.DATABASE_URL!;

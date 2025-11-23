@@ -3,7 +3,7 @@
  */
 
 import { test, expect, describe } from "bun:test";
-import { PrismaBunSqlite } from "../src/adapter";
+import { PrismaBunSqlite } from "../src/index";
 
 describe("Shadow Database Support", () => {
 	test("factory implements SqlMigrationAwareDriverAdapterFactory", () => {

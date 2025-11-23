@@ -340,7 +340,7 @@ export async function createTestDatabase(
 	migrations: Migration[],
 	config?: { safeIntegers?: boolean; timestampFormat?: "iso8601" | "unixepoch-ms" },
 ): Promise<SqlDriverAdapter> {
-	const { PrismaBunSqlite } = await import("./adapter");
+	const { PrismaBunSqlite } = await import("./factory.js");
 
 	const factory = new PrismaBunSqlite({
 		url: ":memory:",
