@@ -6,75 +6,6 @@ This document tracks future improvements, enhancements, and optimizations for `p
 
 ## Future Enhancements
 
-### High Priority
-
-#### 1. Add Debug Logging
-**Why**: Parity with official adapters, easier troubleshooting in production
-
-**Implementation**:
-```typescript
-import { Debug } from '@prisma/driver-adapter-utils'
-const debug = Debug('prisma:driver-adapter:bunsqlite')
-
-async queryRaw(query: SqlQuery) {
-  const tag = '[js::queryRaw]'
-  debug(`${tag} %O`, query)
-  // ...
-}
-```
-
-**Files to change**:
-- `src/adapter.ts`: Add debug calls to all methods
-- Add environment variable docs: `DEBUG=prisma:driver-adapter:bunsqlite`
-
-**Estimated effort**: 1-2 hours
-
----
-
-#### 2. Remove Dead Code
-**Why**: Cleaner codebase, smaller bundle size
-
-**To remove**:
-- `getColumnTypesForQuery()` method (lines 442-476) - never called
-- Verify no other unused code
-
-**Files to change**:
-- `src/adapter.ts`
-
-**Estimated effort**: 30 minutes
-
----
-
-#### 3. Document/Remove Base64 BLOB Handling
-**Why**: May be unnecessary code
-
-**Investigation needed**:
-```typescript
-// Lines 154-165: Does Bun actually return BLOBs as base64?
-if (typeof value === "string" && columnTypes[i] === ColumnTypeEnum.Bytes) {
-  try {
-    const buffer = Buffer.from(value, "base64");
-    result[i] = Array.from(buffer);
-    continue;
-  } catch {
-    // If not base64, treat as regular string
-  }
-}
-```
-
-**Action**:
-1. Test if Bun ever returns BLOBs as base64 strings
-2. If NO: Remove code (17 lines)
-3. If YES: Add comment explaining when this happens
-
-**Files to change**:
-- `src/adapter.ts`
-- Add test if keeping the code
-
-**Estimated effort**: 1 hour
-
----
-
 ### Medium Priority
 
 #### 5. Refactor into Modular Files
@@ -99,166 +30,7 @@ src/
 
 **Estimated effort**: 4-6 hours
 
----
-
-#### 6. Add Comprehensive JSDoc Comments
-**Why**: Better IDE autocomplete, clearer API
-
-**Example**:
-```typescript
-/**
- * Creates a Prisma adapter for Bun's native SQLite.
- *
- * @param config - Configuration options
- * @param config.url - Database URL (file path or :memory:)
- * @param config.safeIntegers - Enable safe 64-bit integers (default: true)
- * @param config.timestampFormat - Timestamp storage format (default: "iso8601")
- *
- * @example
- * ```typescript
- * const adapter = new PrismaBunSqlite({ url: "file:./dev.db" });
- * const prisma = new PrismaClient({ adapter });
- * ```
- *
- * @see https://github.com/mmvsk/prisma-adapter-bun-sqlite
- */
-```
-
-**Files to update**:
-- All public classes and methods
-- Configuration types
-
-**Estimated effort**: 2-3 hours
-
----
-
-### Low Priority
-
-#### 7. Add TypeScript Strict Mode Lint
-**Why**: Catch type regressions early
-
-**Implementation**:
-```json
-// package.json
-{
-  "scripts": {
-    "lint": "tsc --noEmit",
-    "lint:strict": "tsc --noEmit --strict"
-  }
-}
-```
-
-Add to CI pipeline.
-
-**Estimated effort**: 1 hour
-
----
-
-#### 8. Improve Column Metadata Safety
-**Why**: Reduce dependency on undocumented Bun API
-
-**Current**:
-```typescript
-const columnNames = (stmt as any).columnNames || [];
-const declaredTypes = (stmt as any).declaredTypes || [];
-```
-
-**Improvements**:
-1. Add runtime check for property existence:
-```typescript
-const hasMetadata = 'columnNames' in stmt && 'declaredTypes' in stmt;
-if (!hasMetadata) {
-  // Fallback to PRAGMA or other method
-  console.warn('[bunsqlite] Statement metadata unavailable');
-}
-```
-
-2. File Bun issue: Request official API for `columnNames` and `declaredTypes`
-
-**Estimated effort**: 2 hours + upstream discussion
-
----
-
-## v0.3.0 - Performance & Optimization
-
-### Performance Improvements
-
-#### 9. Consider `usePhantomQuery: false`
-**Why**: Fewer queries, better performance
-
-**Caveat**: Requires complete transaction rewrite
-
-**Investigation needed**:
-1. Benchmark current performance with `usePhantomQuery: true`
-2. Prototype with `usePhantomQuery: false`
-3. Measure performance difference
-4. Decide if benefit justifies refactor
-
-**Changes required**:
-- Set `usePhantomQuery: false`
-- Remove COMMIT/ROLLBACK from transaction methods
-- Let Prisma handle transaction lifecycle
-- Update tests
-- Update documentation
-
-**Estimated effort**: 6-8 hours + extensive testing
-
-**Decision**: Needs performance data to justify
-
----
-
-#### 10. Add Performance Benchmarks
-**Why**: Quantify performance, track regressions
-
-**Benchmarks to add**:
-```typescript
-// benchmark.ts
-import { performance } from 'perf_hooks'
-
-const benchmarks = {
-  'Simple query': () => prisma.user.findMany(),
-  'Complex join': () => prisma.user.findMany({ include: { posts: true } }),
-  'Transaction': () => prisma.$transaction([...]),
-  'Raw query': () => prisma.$queryRaw`SELECT * FROM User`,
-  'Bulk insert': () => prisma.user.createMany({ data: [...] }),
-}
-
-// Compare with libsql adapter
-```
-
-**Files to add**:
-- `benchmark/simple.ts`
-- `benchmark/complex.ts`
-- `benchmark/comparison.ts`
-- Add `bun run benchmark` script
-
-**Estimated effort**: 4-6 hours
-
----
-
-#### 11. Cache Schema Info (Optional)
-**Why**: Reduce repeated PRAGMA calls
-
-**Current**: Each query may hit `PRAGMA table_info()`
-
-**Optimization**:
-```typescript
-class BunSqliteAdapter {
-  private schemaCache = new Map<string, TableSchema>()
-
-  private getTableSchema(tableName: string): TableSchema {
-    if (!this.schemaCache.has(tableName)) {
-      const schema = this.db.query(`PRAGMA table_info("${tableName}")`).all()
-      this.schemaCache.set(tableName, schema)
-    }
-    return this.schemaCache.get(tableName)!
-  }
-}
-```
-
-**Consideration**: Cache invalidation on migrations
-
-**Estimated effort**: 3-4 hours
+**Status**: Not started - current single-file approach works well for now
 
 ---
 
@@ -285,7 +57,7 @@ class BunSqliteAdapter {
 
 #### 14. Comprehensive Documentation
 **Docs to complete**:
-- [ ] Migration guides (from better-sqlite3, libsql)
+- [x] Migration guides (from better-sqlite3, libsql) - in README
 - [ ] Troubleshooting guide
 - [ ] Performance tuning guide
 - [ ] FAQ section
@@ -296,27 +68,6 @@ class BunSqliteAdapter {
 ## Future Considerations
 
 ### Features Under Consideration
-
-#### 15. Configurable PRAGMA Settings
-**Why**: Give users control over SQLite behavior
-
-**Proposal**:
-```typescript
-new PrismaBunSqlite({
-  url: "file:./dev.db",
-  pragmas: {
-    foreignKeys: true,      // default: true
-    busyTimeout: 5000,      // default: 5000
-    journalMode: "WAL",     // default: WAL
-    synchronous: "NORMAL",  // new option
-    cacheSize: -2000,       // new option
-  }
-})
-```
-
-**Decision**: Wait for user requests
-
----
 
 #### 16. Connection Pooling
 **Why**: Better performance under high concurrency
@@ -362,6 +113,18 @@ new PrismaBunSqlite({
 - ✅ **Enhanced Type Support** - Added UNSIGNED integers, VARCHAR lengths, JSON, CHAR types
 - ✅ **13 New Tests** - Comprehensive WAL and type support testing (90 total tests)
 
+### v0.4.5+
+- ✅ **#7: TypeScript Strict Mode** - Using `bun tsc --noEmit` for type checking
+- ✅ **#8: Column Metadata Safety** - Added `|| []` fallbacks and robust column count handling
+- ✅ **#10: Performance Benchmarks** - Separate repo: `benchmark-prisma-sqlite-adapter`
+- ✅ **#18: Prisma Integration Tests** - Ported 40 official test scenarios
+- ✅ **#19: libsql-style Unit Tests** - Covered via official-scenarios.test.ts
+- ✅ **#20: lastInsertId** - Now returned for INSERT/UPDATE/DELETE statements
+- ✅ **Reliability Review** - Comprehensive comparison with official Rust engine (quaint)
+- ✅ **Always coerce arg types** - Removed fast-path optimization for correctness
+- ✅ **useTransaction for migrations** - Properly implemented BEGIN/COMMIT/ROLLBACK
+- ✅ **131 Total Tests** - Comprehensive coverage including edge cases from prisma-engines
+
 ---
 
 ## Decision Log
@@ -395,6 +158,31 @@ new PrismaBunSqlite({
    - Production users can enable with custom configuration
    - Prevents unexpected behavior changes
 
+7. **No schema caching** (v0.4.5)
+   - Rationale: We use `stmt.declaredTypes` not PRAGMA queries
+   - Caching could cause issues with migrations/schema changes
+   - Simplicity over premature optimization
+
+8. **Keep `BEGIN` (not `BEGIN IMMEDIATE`)** (v0.4.5)
+   - Rationale: Matches better-sqlite3 adapter
+   - Our AsyncMutex already serializes transactions
+   - `BEGIN IMMEDIATE` only helps with multiple connections (we have one)
+
+9. **Keep ISO8601 as default timestamp format** (v0.4.5)
+   - Rationale: Matches better-sqlite3, human-readable, works with SQLite date functions
+   - Official Rust engine uses `unixepoch-ms` but that's less user-friendly
+   - Users can opt into `unixepoch-ms` if needed
+
+10. **Keep defensive PRAGMA defaults** (v0.4.5)
+    - `foreign_keys=ON` and `busy_timeout=5000` even though official adapters don't set these
+    - Rationale: More production-ready out of the box
+    - Prisma schemas expect FK constraints to work
+
+11. **Always coerce argument types** (v0.4.5)
+    - Removed "fast path" that skipped mapArg for non-datetime/bytes/boolean types
+    - Rationale: Ensures strings are properly converted to int/decimal/bigint
+    - Correctness over micro-optimization
+
 ---
 
 ## Review Schedule
@@ -414,7 +202,7 @@ Want to help? Pick an item from the backlog!
 3. Make changes with tests
 4. Submit PR referencing the backlog item
 
-See [ARCHITECTURE.md](../ARCHITECTURE.md) for implementation details.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for implementation details and reliability review findings.
 
 ---
 
@@ -425,5 +213,5 @@ See [ARCHITECTURE.md](../ARCHITECTURE.md) for implementation details.
 
 ---
 
-**Last updated**: Post v0.1.1 release
+**Last updated**: v0.4.5 (Reliability Review & Official Test Suite)
 **Next review**: After first production deployments

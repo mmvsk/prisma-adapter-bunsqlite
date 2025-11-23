@@ -105,7 +105,7 @@ export async function runMigrations(
 	migrations: Migration[],
 	options: MigrationOptions = {},
 ): Promise<void> {
-	const { skipApplied = true, logger = console.log } = options;
+	const { skipApplied = true, logger = console.log, useTransaction = false } = options;
 
 	// Create migration tracking table
 	await adapter.executeScript(MIGRATION_TABLE_SQL);
@@ -116,44 +116,66 @@ export async function runMigrations(
 		throw new Error("Cannot access underlying database from adapter");
 	}
 
-	for (const migration of migrations) {
-		// Check if already applied
-		if (skipApplied) {
-			const applied = db
-				.prepare("SELECT id FROM _prisma_migrations WHERE migration_name = ?")
-				.get(migration.name);
+	let transactionActive = false;
+	if (useTransaction) {
+		db.run("BEGIN");
+		transactionActive = true;
+	}
 
-			if (applied) {
-				logger(`⏭️  ${migration.name} (already applied)`);
-				continue;
+	try {
+		for (const migration of migrations) {
+			// Check if already applied
+			if (skipApplied) {
+				const applied = db
+					.prepare("SELECT id FROM _prisma_migrations WHERE migration_name = ?")
+					.get(migration.name);
+
+				if (applied) {
+					logger(`⏭️  ${migration.name} (already applied)`);
+					continue;
+				}
 			}
-		}
 
-		logger(`▶️  ${migration.name}...`);
+			logger(`▶️  ${migration.name}...`);
 
-		try {
-			const startTime = Date.now();
+			try {
+				const startTime = Date.now();
 
-			// Apply migration
-			await adapter.executeScript(migration.sql);
+				// Apply migration
+				await adapter.executeScript(migration.sql);
 
-			// Record migration
-			const id = crypto.randomUUID();
-			const checksum = await generateChecksum(migration.sql);
-			const now = new Date().toISOString();
+				// Record migration
+				const id = crypto.randomUUID();
+				const checksum = await generateChecksum(migration.sql);
+				const now = new Date().toISOString();
 
-			db.prepare(`
+				db.prepare(`
 				INSERT INTO _prisma_migrations (
 					id, checksum, migration_name, finished_at, applied_steps_count
 				) VALUES (?, ?, ?, ?, ?)
 			`).run(id, checksum, migration.name, now, 1);
 
-			const duration = Date.now() - startTime;
-			logger(`✅ ${migration.name} (${duration}ms)`);
-		} catch (error: any) {
-			logger(`❌ ${migration.name} failed: ${error.message}`);
-			throw error;
+				const duration = Date.now() - startTime;
+				logger(`✅ ${migration.name} (${duration}ms)`);
+			} catch (error: any) {
+				logger(`❌ ${migration.name} failed: ${error.message}`);
+				throw error;
+			}
 		}
+
+		if (transactionActive) {
+			db.run("COMMIT");
+			transactionActive = false;
+		}
+	} catch (error) {
+		if (transactionActive) {
+			try {
+				db.run("ROLLBACK");
+			} catch (rollbackError: any) {
+				logger(`⚠️  Failed to rollback migrations transaction: ${rollbackError.message}`);
+			}
+		}
+		throw error;
 	}
 }
 

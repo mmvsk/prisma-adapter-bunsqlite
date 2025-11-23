@@ -334,4 +334,43 @@ describe("Migration Utilities", () => {
 
 		await adapter.dispose();
 	});
+
+	test("useTransaction rolls back all migrations on failure", async () => {
+		const factory = new PrismaBunSqlite({ url: ":memory:" });
+		const adapter = await factory.connect();
+
+		const migrations: Migration[] = [
+			{
+				name: "001_create_table",
+				sql: "CREATE TABLE tx_users (id INTEGER PRIMARY KEY, email TEXT);",
+			},
+			{
+				name: "002_fail_late",
+				sql: "INSERT INTO tx_users (id, email) VALUES (1, 'user@example.com'); INVALID SQL;",
+			},
+		];
+
+		let errorThrown = false;
+		try {
+			await runMigrations(adapter, migrations, {
+				logger: () => {},
+				useTransaction: true,
+			});
+		} catch {
+			errorThrown = true;
+		}
+
+		expect(errorThrown).toBe(true);
+
+		// Table should not exist because the transaction rolled back
+		const tables = await adapter.queryRaw({
+			sql: "SELECT name FROM sqlite_master WHERE type='table' AND name='tx_users'",
+			args: [],
+			argTypes: [],
+		});
+
+		expect(tables.rows).toEqual([]);
+
+		await adapter.dispose();
+	});
 });

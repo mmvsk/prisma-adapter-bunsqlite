@@ -253,14 +253,12 @@ function getColumnTypes(declaredTypes: string[], rows: unknown[][]): ColumnType[
 
 /**
  * Maps a row of values from SQLite format to Prisma format
- * Uses Array.from() for efficient pre-allocation, then modifies in-place
  */
 function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
-	// Pre-allocate array with correct size (more efficient than empty array + index assignment)
-	const result: unknown[] = Array.from(row);
+	const result: unknown[] = new Array(row.length);
 
-	for (let i = 0; i < result.length; i++) {
-		const value = result[i];
+	for (let i = 0; i < row.length; i++) {
+		const value = row[i];
 
 		// Handle BLOB/Bytes - convert to array of numbers
 		if (value instanceof ArrayBuffer) {
@@ -297,7 +295,7 @@ function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
 			continue;
 		}
 
-		// No transformation needed - value already in result from Array.from()
+		result[i] = value;
 	}
 
 	return result;
@@ -334,9 +332,12 @@ function mapArg(arg: unknown, argType: ArgType, timestampFormat: "iso8601" | "un
 			// Convert string to Date if needed
 			const date = typeof arg === "string" ? new Date(arg) : arg;
 			if (date instanceof Date) {
-				return timestampFormat === "unixepoch-ms"
-					? date.getTime()
-					: date.toISOString();
+				if (timestampFormat === "unixepoch-ms") {
+					return date.getTime();
+				}
+				// Use +00:00 suffix instead of Z for better SQLite compatibility
+				// Matches official @prisma/adapter-better-sqlite3 behavior
+				return date.toISOString().replace("Z", "+00:00");
 			}
 			return date;
 		}
@@ -516,47 +517,61 @@ class BunSqliteQueryable {
 		debug(`${tag} %O`, query);
 
 		try {
-			// Fast path: if no special types need conversion, skip mapping
-			const needsMapping = query.argTypes.some(
-				(t) => t && (t.scalarType === "datetime" || t.scalarType === "bytes" || t.scalarType === "boolean")
-			);
-
-			// Map arguments from Prisma format to SQLite format (or reuse if no conversion needed)
-			const args = needsMapping
-				? query.args.map((arg, i) => {
-						const argType = query.argTypes[i];
-						return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
-				  })
-				: query.args;
+			// Map arguments from Prisma format to SQLite format
+			// Always run mapArg to ensure strings for ints/decimals are coerced like the official adapters
+			const args = query.args.map((arg, i) => {
+				const argType = query.argTypes[i];
+				return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
+			});
 
 			// Use db.query() which caches compiled statements (vs db.prepare() which recompiles every time)
 			const stmt = this.db.query(query.sql);
+
+			// Get column metadata first to determine if this is a returning query
+			const columnNames = (stmt as any).columnNames || [];
+			const declaredTypes = (stmt as any).declaredTypes || [];
+
+			// Check if this query returns columns (SELECT, INSERT...RETURNING, etc.)
+			// If no columns, use stmt.run() to get lastInsertRowid
+			// If columns exist, use stmt.values() to get row data
+			if (columnNames.length === 0) {
+				// Non-returning statement (INSERT, UPDATE, DELETE without RETURNING)
+				// Use stmt.run() which returns { changes, lastInsertRowid }
+				const result = stmt.run(...(args as any));
+				return {
+					columnNames: [],
+					columnTypes: [],
+					rows: [],
+					// Include lastInsertId for non-returning statements
+					// This matches libsql adapter behavior
+					lastInsertId: String(result.lastInsertRowid),
+				};
+			}
 
 			// IMPORTANT: Use stmt.values() instead of stmt.all() to preserve column order
 			// When queries have duplicate column names (e.g., SELECT u.id, p.id),
 			// stmt.all() returns objects which lose duplicate keys, causing data corruption.
 			// stmt.values() returns arrays preserving all columns in order.
-			//
-			// Note: Bun's columnNames also deduplicates, but we use values() which
-			// returns the correct number of columns. We need to handle this carefully.
-			const rowArrays = (stmt as any).values(...(args as any)) as unknown[][];
-
-			// Get column metadata - note columnNames may be deduplicated by Bun
-			// but the values arrays have the correct number of columns
-			const columnNames = (stmt as any).columnNames || [];
-			const declaredTypes = (stmt as any).declaredTypes || [];
+			const rowArrays = ((stmt as any).values(...(args as any)) as unknown[][] | null) ?? [];
 
 			// Handle column count mismatch due to duplicate names
 			// Only needed for queries with JOINs that have duplicate column names
 			// Skip this expensive check for simple queries
 			const firstRow = rowArrays[0];
-			if (firstRow && firstRow.length > columnNames.length) {
-				const actualColumnCount = firstRow.length;
-				const missingCount = actualColumnCount - columnNames.length;
+			const actualColumnCount = Math.max(
+				declaredTypes.length,
+				firstRow ? firstRow.length : 0,
+				columnNames.length,
+			);
 
-				// Pad columnNames and declaredTypes to match actual column count
-				for (let i = 0; i < missingCount; i++) {
-					columnNames.push(`column_${columnNames.length}`);
+			if (columnNames.length < actualColumnCount) {
+				for (let i = columnNames.length; i < actualColumnCount; i++) {
+					columnNames.push(`column_${i}`);
+				}
+			}
+
+			if (declaredTypes.length < actualColumnCount) {
+				for (let i = declaredTypes.length; i < actualColumnCount; i++) {
 					declaredTypes.push(null);
 				}
 			}
@@ -566,7 +581,7 @@ class BunSqliteQueryable {
 			const columnTypes = getColumnTypes(declaredTypes, rowArrays);
 
 			// If no results, return empty set with column metadata
-			if (!rowArrays || rowArrays.length === 0) {
+			if (rowArrays.length === 0) {
 				return {
 					columnNames,
 					columnTypes,
@@ -581,6 +596,8 @@ class BunSqliteQueryable {
 				columnNames,
 				columnTypes,
 				rows: mappedRows,
+				// Don't include lastInsertId for SELECT queries or INSERT with RETURNING
+				// as the data is already in the rows
 			};
 		} catch (error: any) {
 			throw new DriverAdapterError(convertDriverError(error));
@@ -595,18 +612,11 @@ class BunSqliteQueryable {
 		debug(`${tag} %O`, query);
 
 		try {
-			// Fast path: if no special types need conversion, skip mapping
-			const needsMapping = query.argTypes.some(
-				(t) => t && (t.scalarType === "datetime" || t.scalarType === "bytes" || t.scalarType === "boolean")
-			);
-
-			// Map arguments from Prisma format to SQLite format (or reuse if no conversion needed)
-			const args = needsMapping
-				? query.args.map((arg, i) => {
-						const argType = query.argTypes[i];
-						return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
-				  })
-				: query.args;
+			// Always map arguments to match official adapter semantics
+			const args = query.args.map((arg, i) => {
+				const argType = query.argTypes[i];
+				return argType ? mapArg(arg, argType, this.timestampFormat) : arg;
+			});
 
 			// Use db.query() which caches compiled statements (vs db.prepare() which recompiles every time)
 			const stmt = this.db.query(query.sql);
@@ -619,14 +629,26 @@ class BunSqliteQueryable {
 }
 
 /**
- * Transaction implementation
+ * Transaction state for defensive programming
+ * Prevents queries on closed transactions and provides clear error messages
+ */
+type TransactionState = "active" | "committed" | "rolled_back";
+
+/**
+ * Transaction implementation with state tracking
  *
  * With usePhantomQuery: false, the Prisma engine sends actual COMMIT/ROLLBACK
- * SQL statements through executeRaw(). These methods only release the mutex lock.
+ * SQL statements through executeRaw(). The commit/rollback methods update state
+ * and release the mutex lock.
  *
- * This matches the official @prisma/adapter-better-sqlite3 implementation.
+ * State tracking provides defensive programming benefits:
+ * - Prevents queries on closed transactions
+ * - Clear error messages for debugging
+ * - Catches potential Prisma engine bugs early
  */
 class BunSqliteTransaction extends BunSqliteQueryable implements Transaction {
+	private state: TransactionState = "active";
+
 	constructor(
 		db: Database,
 		readonly options: TransactionOptions,
@@ -636,17 +658,53 @@ class BunSqliteTransaction extends BunSqliteQueryable implements Transaction {
 		super(db, adapterOptions);
 	}
 
+	/**
+	 * Execute a query within the transaction
+	 * Throws if transaction is already closed
+	 */
+	override async queryRaw(query: SqlQuery): Promise<SqlResultSet> {
+		if (this.state !== "active") {
+			throw new DriverAdapterError({
+				kind: "TransactionAlreadyClosed",
+				cause: `Cannot execute query on a ${this.state} transaction.`,
+			});
+		}
+		return super.queryRaw(query);
+	}
+
+	/**
+	 * Execute a statement within the transaction
+	 * Throws if transaction is already closed
+	 */
+	override async executeRaw(query: SqlQuery): Promise<number> {
+		if (this.state !== "active") {
+			throw new DriverAdapterError({
+				kind: "TransactionAlreadyClosed",
+				cause: `Cannot execute statement on a ${this.state} transaction.`,
+			});
+		}
+		return super.executeRaw(query);
+	}
+
+	/**
+	 * Commit the transaction
+	 * With usePhantomQuery: false, Prisma engine sends COMMIT via executeRaw
+	 * This method updates state and releases the lock
+	 */
 	async commit(): Promise<void> {
 		debug("[js::commit]");
-		// With usePhantomQuery: false, Prisma engine sends COMMIT via executeRaw
-		// This method just releases the transaction lock
+		this.state = "committed";
 		this.releaseLock();
 	}
 
+	/**
+	 * Rollback the transaction
+	 * With usePhantomQuery: false, Prisma engine sends ROLLBACK via executeRaw
+	 * This method updates state and releases the lock
+	 */
 	async rollback(): Promise<void> {
 		debug("[js::rollback]");
-		// With usePhantomQuery: false, Prisma engine sends ROLLBACK via executeRaw
-		// This method just releases the transaction lock
+		this.state = "rolled_back";
 		this.releaseLock();
 	}
 }

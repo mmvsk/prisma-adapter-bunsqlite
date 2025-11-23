@@ -3,7 +3,7 @@
 A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/api/sqlite) (`bun:sqlite`). Zero Node.js dependencies, optimized for Bun runtime.
 
 [![npm version](https://img.shields.io/npm/v/prisma-adapter-bun-sqlite)](https://www.npmjs.com/package/prisma-adapter-bun-sqlite)
-[![Tests](https://img.shields.io/badge/tests-90%2F90%20passing-success)](./tests)
+[![Tests](https://img.shields.io/badge/tests-131%2F131%20passing-success)](./tests)
 [![Bun](https://img.shields.io/badge/bun-v1.3.2+-black)](https://bun.sh)
 [![Prisma](https://img.shields.io/badge/prisma-7.0.0+-blue)](https://prisma.io)
 
@@ -15,7 +15,7 @@ A native Prisma driver adapter for [Bun's built-in SQLite](https://bun.sh/docs/a
 - **⚙️ Production-Ready WAL Configuration**: Advanced WAL options for optimal write performance (synchronous modes, autocheckpoint, busy timeout)
 - **📦 Pure JavaScript Migrations**: Run migrations programmatically without shipping migration files or CLI tools (v0.2.0+)
 - **🎯 Single Binary Deployment**: Perfect for `bun build --compile` - embed everything in one executable
-- **✅ Fully Tested**: Passes 90/90 comprehensive tests covering all Prisma operations
+- **✅ Fully Tested**: Passes 131/131 comprehensive tests covering all Prisma operations
 - **🔄 Full Migration Support**: Shadow database + programmatic migrations for seamless development and deployment
 - **📝 Fully Compatible**: Drop-in replacement for `@prisma/adapter-libsql` or `@prisma/adapter-better-sqlite3`
 - **⚡ Comparable Performance**: Similar performance to alternatives with superior feature set
@@ -453,13 +453,15 @@ const prisma = new PrismaClient({ adapter });
 Run the comprehensive test suite:
 
 ```bash
-# Run all tests (77 tests: 57 general + 11 migrations + 9 shadow DB)
+# Run all tests (131 tests total)
 bun test
 
 # Run specific test suites
-bun test tests/general.test.ts           # Core adapter tests
-bun test tests/migrations.test.ts        # Migration utility tests
-bun test tests/shadow-database.test.ts   # Shadow DB tests
+bun test tests/general.test.ts           # Core adapter tests (57)
+bun test tests/migrations.test.ts        # Migration utility tests (12)
+bun test tests/shadow-database.test.ts   # Shadow DB tests (9)
+bun test tests/wal-configuration.test.ts # WAL configuration tests (13)
+bun test tests/official-scenarios.test.ts # Official Prisma scenarios (40)
 
 # Run with verbose output
 bun test --verbose
@@ -467,16 +469,10 @@ bun test --verbose
 
 Test coverage includes:
 - 57 **Core Adapter Tests** (CRUD, relations, transactions, types, errors)
-- 11 **Migration Utility Tests** (v0.2.0+)
+- 12 **Migration Utility Tests** (v0.2.0+)
 - 9 **Shadow Database Tests** (v0.2.0+)
-- 6 relation tests (including cascade deletes)
-- 9 filtering & querying tests
-- 3 aggregation tests
-- 3 transaction tests (commit, rollback, sequential)
-- 4 raw query tests
-- 7 type coercion tests
-- 4 error handling tests
-- 6 edge case tests
+- 13 **WAL Configuration Tests** (v0.4.0+)
+- 40 **Official Prisma Scenario Tests** - ported from Prisma's official test suite and quaint engine
 
 ## Performance
 

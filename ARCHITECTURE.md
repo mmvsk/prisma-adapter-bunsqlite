@@ -516,6 +516,188 @@ const declaredTypes = (stmt as any).declaredTypes || [];
 
 **Documented:** Added explanatory comments in v0.1.1 (see lines 382-387 in src/adapter.ts)
 
+## Reliability Review (v0.4.4+)
+
+This section documents the comprehensive reliability review comparing our adapter against official Prisma adapters.
+
+### Verified Correct (Matches Official better-sqlite3)
+
+1. **Transaction handling** - `usePhantomQuery: false`, commit/rollback just release lock
+2. **Error handling** - `convertDriverError` pattern with proper Prisma error kinds
+3. **Isolation level validation** - Rejects non-SERIALIZABLE with `InvalidIsolationLevel`
+4. **executeScript** - Uses native `db.exec()` for multi-statement scripts
+5. **dispose()** - Properly closes database
+6. **Factory pattern** - Implements `SqlMigrationAwareDriverAdapterFactory`
+7. **Safe integers** - Enabled by default (like official)
+8. **DateTime format** - Uses `+00:00` suffix (matches official)
+
+### Extra Defensive Features (Beyond Official)
+
+1. **Transaction state tracking** - Throws `TransactionAlreadyClosed` on misuse
+2. **PRAGMA settings** - `foreign_keys=ON`, `busy_timeout=5000` (official sets NONE!)
+3. **Custom AsyncMutex** - 34-line impl vs `async-mutex` package
+4. **lastInsertId support** - Returns lastInsertId for INSERT/UPDATE/DELETE (like libsql)
+
+### Differences from Official (Intentional)
+
+1. **PRAGMA foreign_keys = ON**
+   - Official: Does NOT enable foreign keys
+   - Ours: Enables by default
+   - Rationale: Prisma schemas with relations expect FK constraints to work
+   - This is a FEATURE, not a bug
+
+2. **Statement metadata**
+   - Official: Uses `stmt.reader` check for non-returning queries
+   - Ours: Uses Bun's `stmt.declaredTypes` and `stmt.columnNames` + `stmt.run()` for non-returning
+   - Both work correctly, different approaches
+
+3. **lastInsertId**
+   - Official better-sqlite3: Does NOT return lastInsertId
+   - Official libsql: Returns lastInsertId
+   - Ours: Returns lastInsertId (matches libsql pattern)
+
+### No Brittle Patterns
+
+- ✅ NO SQL parsing for COMMIT/ROLLBACK detection
+- ✅ NO regex-based table name extraction for transactions
+- ✅ NO string splitting for error code extraction (use errno mapping)
+
+### Official Test Suite Coverage
+
+The adapter includes 40 tests ported from Prisma's official SQLite test scenarios and the quaint Rust engine:
+
+```
+tests/official-scenarios.test.ts - 40 tests covering:
+├── Simple queries (SELECT, INSERT, UPDATE, DELETE)
+├── Boolean handling (true/false ↔ 1/0)
+├── DateTime handling (ISO8601 format)
+├── Decimal handling (as TEXT)
+├── Foreign key constraints
+├── Composite primary keys
+├── String operations (LIKE, IN)
+├── NULL handling
+├── Ordering (ASC/DESC)
+├── Transactions (commit, rollback)
+├── Error handling (constraint violations)
+├── executeScript (multi-statement SQL)
+├── Shadow database support
+├── lastInsertId for non-returning statements
+└── Edge cases from prisma-engines/quaint:
+    ├── DateTime from YYYY-MM-DD HH:MM:SS format
+    ├── DateTime from RFC3339 format
+    ├── Column not found on read/write
+    ├── Integer boundaries (i32 min/max)
+    ├── BigInt boundaries (i64 min/max)
+    └── Multi-statement script error detection
+```
+
+---
+
+## Comparison with Official Rust Query Engine (quaint)
+
+This section documents findings from analyzing the official Prisma Rust query engine (`prisma-engines/quaint`) - the pre-Prisma-7 implementation that handled all SQLite operations.
+
+### Error Codes - IDENTICAL ✅
+
+The Rust engine uses the exact same SQLite extended error codes:
+
+```rust
+// From quaint/src/connector/sqlite/ffi.rs
+pub const SQLITE_BUSY: i32 = 5;
+pub const SQLITE_CONSTRAINT_FOREIGNKEY: i32 = 787;
+pub const SQLITE_CONSTRAINT_NOTNULL: i32 = 1299;
+pub const SQLITE_CONSTRAINT_PRIMARYKEY: i32 = 1555;
+pub const SQLITE_CONSTRAINT_TRIGGER: i32 = 1811;
+pub const SQLITE_CONSTRAINT_UNIQUE: i32 = 2067;
+```
+
+Our error handling matches exactly.
+
+### PRAGMA Settings - We're MORE Defensive
+
+| PRAGMA | Official Rust Engine | Our Adapter | Notes |
+|--------|---------------------|-------------|-------|
+| `foreign_keys` | ❌ NOT SET | ✅ `ON` | We enforce FK constraints |
+| `busy_timeout` | ❌ Only if URL param | ✅ `5000ms` | We prevent lock hangs |
+| `journal_mode` | ❌ NOT SET | Optional WAL | Opt-in for performance |
+
+**Rationale for our defaults:**
+- `foreign_keys=ON`: Prisma schemas with `@relation` expect FK constraints to work. Not enabling this silently ignores constraint violations.
+- `busy_timeout=5000`: Without this, locked databases cause immediate errors instead of waiting. 5 seconds is a reasonable default.
+- WAL mode: Kept as opt-in because it changes file structure (creates `-wal` and `-shm` files).
+
+### Transaction BEGIN Statement
+
+| | Official Rust Engine | better-sqlite3 Adapter | Our Adapter |
+|--|---------------------|------------------------|-------------|
+| Statement | `BEGIN IMMEDIATE` | `BEGIN` | `BEGIN` |
+
+**Why we use `BEGIN` (not `BEGIN IMMEDIATE`):**
+
+The Rust engine uses `BEGIN IMMEDIATE` to avoid `SQLITE_BUSY_SNAPSHOT` errors when multiple connections compete for write locks. However:
+
+1. **We have a mutex**: Our `AsyncMutex` serializes all transactions at the adapter level
+2. **Single connection**: We don't use connection pooling
+3. **Matches better-sqlite3**: The TypeScript adapter we're most similar to uses plain `BEGIN`
+
+`BEGIN IMMEDIATE` would only help with concurrent connections, which we don't have.
+
+### DateTime Storage Format
+
+| | Official Rust Engine | better-sqlite3 Adapter | Our Adapter |
+|--|---------------------|------------------------|-------------|
+| Default | `unixepoch-ms` (integer) | `iso8601` (string) | `iso8601` (string) |
+| Configurable | No | Yes | Yes |
+
+**Why we default to ISO8601:**
+
+| Aspect | ISO8601 | Unix millis |
+|--------|---------|-------------|
+| Human readable | ✅ `2024-01-15T10:30:00+00:00` | ❌ `1705315800000` |
+| SQLite date functions | ✅ `datetime()`, `date()` work | ❌ Need conversion |
+| DB browser inspection | ✅ Easy to read | ❌ Need to decode |
+| Storage size | ~25 bytes | 8 bytes |
+| Sort/compare speed | Slower (string) | Faster (integer) |
+
+For most applications, readability and SQLite function compatibility outweigh the small performance difference. Users who need raw performance can opt into `unixepoch-ms`.
+
+### lastInsertId
+
+```rust
+// From quaint/src/connector/sqlite/native/mod.rs:118
+result.set_last_insert_id(u64::try_from(client.last_insert_rowid()).unwrap_or(0));
+```
+
+The Rust engine returns `lastInsertId` for all queries. We now match this behavior.
+
+### Isolation Level
+
+Both the Rust engine and our adapter only support `SERIALIZABLE`:
+
+```rust
+// Rust engine
+if !matches!(isolation_level, IsolationLevel::Serializable) {
+    return Err(invalid_isolation_level);
+}
+```
+
+SQLite is inherently serializable; other isolation levels would require shared cache mode.
+
+### Summary: Our Adapter vs All Official Implementations
+
+| Feature | Rust Engine | better-sqlite3 | libsql | **Our Adapter** |
+|---------|------------|----------------|--------|-----------------|
+| `foreign_keys` | ❌ Off | ❌ Off | ❌ Off | ✅ **On** |
+| `busy_timeout` | ❌ Manual | ❌ None | ❌ None | ✅ **5000ms** |
+| `BEGIN` type | `IMMEDIATE` | `BEGIN` | `BEGIN` | `BEGIN` |
+| DateTime default | `millis` | `iso8601` | `iso8601` | `iso8601` |
+| lastInsertId | ✅ Yes | ❌ No | ✅ Yes | ✅ **Yes** |
+| Error codes | ✅ Full | ✅ Full | ✅ Full | ✅ **Full** |
+
+**Conclusion:** Our adapter is **more production-ready** than all official implementations due to defensive PRAGMA defaults.
+
+---
+
 ## New Features in v0.2.0
 
 ### 1. Shadow Database Support
@@ -677,20 +859,20 @@ export type PrismaBunSqliteConfig = {
 | **Error Codes** | String codes + errno map | String codes + errno map ✅ |
 | **Argument Mapping** | `mapArg()` | `mapArg()` ✅ |
 | **Boolean Conversion** | `1/0` | `1/0` ✅ |
-| **usePhantomQuery** | `false` (Prisma handles tx) | `true` (adapter handles tx) |
-| **Transaction Method** | No explicit COMMIT/ROLLBACK | Manual BEGIN/COMMIT/ROLLBACK |
+| **usePhantomQuery** | `false` (Prisma handles tx) | `false` (Prisma handles tx) ✅ |
+| **Transaction Method** | commit()/rollback() release lock | commit()/rollback() release lock ✅ |
 | **Transaction Safety** | `async-mutex` library | Custom AsyncMutex (34 lines) |
 | **Column Detection** | `stmt.columns()` API | `stmt.values()` + metadata |
 | **DateTime Format** | Options support | Options support ✅ |
 | **Safe Integers** | Optional | Default enabled ✅ |
+| **lastInsertId** | Not returned | Returned for INSERT/UPDATE/DELETE ✅ |
 
 **Key Differences:**
 
-1. **Transaction Lifecycle** (IMPORTANT):
-   - **better-sqlite3**: Uses `usePhantomQuery: false`, so Prisma Engine sends COMMIT/ROLLBACK queries. The adapter's `commit()` method just releases a mutex.
-   - **Ours**: Uses `usePhantomQuery: true`, so the adapter MUST call `db.run("COMMIT")` and `db.run("ROLLBACK")` explicitly.
-   - **Both are correct**: These are two valid design patterns. Matches `@prisma/adapter-libsql` which also uses `usePhantomQuery: true`.
-   - **Rationale**: The two approaches are tightly coupled - changing one requires changing the other.
+1. **Transaction Lifecycle** (MATCHES OFFICIAL):
+   - **better-sqlite3**: Uses `usePhantomQuery: false`, so Prisma Engine sends COMMIT/ROLLBACK queries via executeRaw(). The adapter's `commit()` method just releases a mutex.
+   - **Ours**: Uses `usePhantomQuery: false` (same pattern). Prisma engine sends COMMIT/ROLLBACK SQL, our commit()/rollback() release the lock.
+   - **Both identical**: We match the official better-sqlite3 adapter pattern exactly.
 
 2. **Transaction Locking**:
    - **better-sqlite3**: Uses `async-mutex` npm package (dependency)
@@ -751,27 +933,26 @@ db.run("UPDATE ...");
 db.run("COMMIT");
 ```
 
-### 2. Why `usePhantomQuery: true`?
+### 2. Why `usePhantomQuery: false`?
 
-**Decision**: Set `usePhantomQuery: true` in transaction options
+**Decision**: Set `usePhantomQuery: false` in transaction options (matches official better-sqlite3 adapter)
 
 **What it means**:
-- When `true`: Prisma sends "phantom queries" to verify transaction state, and expects the adapter to call BEGIN/COMMIT/ROLLBACK
-- When `false`: Prisma Engine sends explicit COMMIT/ROLLBACK queries, and the adapter just manages connection state
+- When `false`: Prisma Engine sends explicit COMMIT/ROLLBACK queries through executeRaw(), adapter's commit()/rollback() just release the mutex lock
+- When `true`: Adapter must call BEGIN/COMMIT/ROLLBACK explicitly in commit()/rollback() methods
 
 **Reasoning**:
-- Matches `@prisma/adapter-libsql` pattern (official adapter)
-- Simpler implementation with manual transaction lifecycle
-- **CRITICAL**: This setting is tightly coupled with transaction methods - both must be changed together
-- Changing to `false` would require complete rewrite of transaction lifecycle
+- **Matches official `@prisma/adapter-better-sqlite3`** - same pattern, same behavior
+- Cleaner separation: Engine controls transaction SQL, adapter controls locking
+- Simpler implementation: commit()/rollback() are just mutex unlocks
+- No edge cases: No need to intercept or special-case COMMIT/ROLLBACK SQL
 
 **Trade-offs**:
-- ✅ Adapter has full control over transaction lifecycle
-- ✅ Simple BEGIN/COMMIT/ROLLBACK implementation
-- ⚠️ Slightly more query overhead (phantom queries for state verification)
-- ⚠️ Different pattern than better-sqlite3 (which uses `false`)
+- ✅ Exact match with official better-sqlite3 adapter pattern
+- ✅ Cleaner separation of concerns
+- ✅ Simpler commit()/rollback() implementation
 
-**Note**: Both `true` and `false` are valid designs used by official adapters
+**Changed**: v0.4.0 switched from `usePhantomQuery: true` to `false` to match official adapter
 
 ### 3. Why PRAGMA for Column Types?
 
@@ -961,17 +1142,20 @@ bun test --verbose
 ### Test Results
 
 ```
-✅ General Tests:         57/57 tests passing (v0.2.0)
-✅ Migration Tests:       11/11 tests passing (v0.2.0)
-✅ Shadow Database Tests:  9/9 tests passing (v0.2.0)
+✅ General Tests:              57/57 tests passing
+✅ Migration Tests:            12/12 tests passing
+✅ Shadow Database Tests:       9/9 tests passing
+✅ WAL Configuration Tests:    13/13 tests passing
+✅ Official Scenarios Tests:   40/40 tests passing
 ──────────────────────────────────────────────────────
-✅ Total:                 77/77 tests passing
+✅ Total:                     131/131 tests passing
 ```
 
 **Test Evolution:**
 - v0.1.0: 110 tests
 - v0.1.1: 113 tests (added regression tests)
 - v0.2.0: 77 tests (consolidated + new features, removed baseline duplication)
+- v0.4.4+: 131 tests (added official scenarios, WAL tests, edge cases from prisma-engines)
 
 ## Performance Considerations
 
