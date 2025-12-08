@@ -44,7 +44,7 @@ describe("Shadow Database Support", () => {
 			argTypes: [],
 		});
 
-		// Numbers are returned as strings (Prisma format)
+		// Integers are returned as strings (BigInt→string conversion)
 		expect(result.rows).toEqual([["1"]]);
 
 		await shadowAdapter.dispose();
@@ -65,7 +65,7 @@ describe("Shadow Database Support", () => {
 			argTypes: [],
 		});
 
-		// Numbers are returned as strings (Prisma format)
+		// Integers are returned as strings (BigInt→string conversion)
 		expect(result.rows).toEqual([["42"]]);
 
 		await shadowAdapter.dispose();

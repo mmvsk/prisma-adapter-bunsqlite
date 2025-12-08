@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.3] - 2025-12-08
+
+### Added
+
+- **Explicit configuration for `unixepoch-ms` timestamp format** - When using `timestampFormat: "unixepoch-ms"`, you must now explicitly choose one of three workarounds for the DateTime aggregate limitation:
+  - `safeIntegers: false` - Disables BigInt, all integers are JS numbers (ensure values stay within safe range)
+  - `allowBigIntToNumberConversion: true` - Converts BigInts in timestamp range to numbers (fixes aggregates, mixed return types)
+  - `allowUnsafeDateTimeAggregates: true` - Accepts that `_min`/`_max` on DateTime return `Invalid Date` (matches `@prisma/adapter-better-sqlite3`)
+
+- **Configuration validation** - Using `timestampFormat: "unixepoch-ms"` without one of the above options now throws a descriptive error at adapter creation, forcing explicit acknowledgment of the trade-off.
+
+### Changed
+
+- Updated README with detailed documentation about timestamp format options, the aggregate limitation, and all three workarounds with their trade-offs.
+
+### Compatibility
+
+- 147 tests passing (10 new tests: 9 configuration validation + 1 DateTime aggregate fix)
+- Supports Prisma 7.0.0+ and Bun 1.3.3+
+
+### Thanks
+
+- Thanks to [@crishoj](https://github.com/crishoj) for documenting the DateTime aggregate limitation in PR #2
+
+---
+
 ## [0.6.2] - 2025-12-08
 
 ### Changed
@@ -16,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Compatibility
 
-- Tested with Bun 1.3.4 (SQLite 3.51.1) - all 135 tests passing
+- Tested with Bun 1.3.4 (SQLite 3.51.1) - all 137 tests passing
 - Supports Prisma 7.0.0+ and Bun 1.3.3+
 
 ---

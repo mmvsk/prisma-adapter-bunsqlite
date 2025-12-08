@@ -76,8 +76,12 @@ export type WalConfiguration = {
 export type PrismaBunSqliteOptions = {
 	/**
 	 * How to format DateTime values in the database.
-	 * - `iso8601`: Stores as ISO 8601 strings (human-readable, default)
+	 * - `iso8601`: Stores as ISO 8601 strings (human-readable, default, recommended)
 	 * - `unixepoch-ms`: Stores as Unix timestamps in milliseconds (more efficient)
+	 *
+	 * **Warning:** When using `unixepoch-ms`, you must also set either
+	 * `allowBigIntToNumberConversion` or `allowUnsafeDateTimeAggregates` to acknowledge
+	 * a known limitation with DateTime aggregate functions. See documentation for details.
 	 *
 	 * @default "iso8601"
 	 */
@@ -105,6 +109,37 @@ export type PrismaBunSqliteOptions = {
 	 * @see WalConfiguration
 	 */
 	wal?: boolean | WalConfiguration;
+
+	/**
+	 * **Required when using `timestampFormat: "unixepoch-ms"`.**
+	 *
+	 * When `true`, BigInt values in the timestamp range (0 to ~year 2200) are converted
+	 * to JavaScript numbers instead of strings. This fixes DateTime aggregate functions
+	 * (`_min`, `_max`) but may cause subtle type inconsistencies if you have BigInt columns
+	 * with values in the same range.
+	 *
+	 * Choose this option if:
+	 * - You use DateTime aggregates (`_min`, `_max` on DateTime fields)
+	 * - You don't have BigInt columns with small values (< 7.3 trillion)
+	 *
+	 * @default undefined
+	 */
+	allowBigIntToNumberConversion?: boolean;
+
+	/**
+	 * **Required when using `timestampFormat: "unixepoch-ms"`.**
+	 *
+	 * When `true`, acknowledges that DateTime aggregate functions (`_min`, `_max`)
+	 * may return `Invalid Date` due to BigInt-to-string conversion. Use this if you
+	 * don't use DateTime aggregates or prefer consistent BigInt→string behavior.
+	 *
+	 * Choose this option if:
+	 * - You don't use DateTime aggregates
+	 * - You have BigInt columns and want consistent string conversion
+	 *
+	 * @default undefined
+	 */
+	allowUnsafeDateTimeAggregates?: boolean;
 };
 
 /**

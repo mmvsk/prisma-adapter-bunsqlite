@@ -174,10 +174,17 @@ function inferTypeFromValue(value: unknown): ColumnType | null {
 
 /**
  * Maps a row of values from SQLite format to Prisma format
+ *
+ * @param row - Raw row values from SQLite
+ * @param columnTypes - Column type information for proper conversion
+ * @param allowBigIntToNumberConversion - When true, BigInt values in timestamp range are converted to numbers
  */
-export function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
+export function mapRow(
+	row: unknown[],
+	columnTypes: ColumnType[],
+	allowBigIntToNumberConversion = false,
+): unknown[] {
 	const result: unknown[] = new Array(row.length);
-
 	for (let i = 0; i < row.length; i++) {
 		const value = row[i];
 
@@ -210,9 +217,17 @@ export function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
 			continue;
 		}
 
-		// Handle BigInt - convert to string for Prisma
+		// Handle BigInt
 		if (typeof value === "bigint") {
-			result[i] = value.toString();
+			// When allowBigIntToNumberConversion is enabled, convert BigInts in timestamp range
+			// to numbers. This fixes DateTime aggregate functions (_min, _max) when using
+			// unixepoch-ms timestamp format, as Prisma can then correctly parse the numeric value.
+			// Range: 0 (1970) to ~7300000000000 (year 2200) covers all reasonable timestamps.
+			if (allowBigIntToNumberConversion && value >= 0n && value <= 7_300_000_000_000n) {
+				result[i] = Number(value);
+			} else {
+				result[i] = value.toString();
+			}
 			continue;
 		}
 

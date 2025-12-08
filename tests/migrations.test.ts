@@ -114,7 +114,7 @@ describe("Migration Utilities", () => {
 
 		expect(result.rows.length).toBe(1);
 		expect(result.rows[0]![0]!).toBe("001_test");
-		expect(result.rows[0]![1]!).toBe("1");
+		expect(result.rows[0]![1]!).toBe("1"); // Integers returned as strings (BigInt→string)
 
 		await adapter.dispose();
 	});
@@ -330,7 +330,7 @@ describe("Migration Utilities", () => {
 		});
 
 		// Post should be deleted due to CASCADE
-		expect(result.rows[0]![0]!).toBe("0");
+		expect(result.rows[0]![0]!).toBe("0"); // COUNT returns string (BigInt→string)
 
 		await adapter.dispose();
 	});

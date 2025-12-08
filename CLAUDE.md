@@ -11,7 +11,7 @@ Reliable, fast, zero-dependency Prisma adapter for Bun's native SQLite.
 
 ## Project Status
 
-**v0.6.0** - 135/135 tests passing
+**v0.6.3** - 147/147 tests passing
 
 ## Compatibility
 

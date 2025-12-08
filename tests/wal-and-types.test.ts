@@ -300,10 +300,10 @@ describe("UNSIGNED Integer Type Support", () => {
 		expect(result.columnTypes[7]).toBe(0);
 
 		// Verify the value is correctly handled
-		// With safeIntegers: true (default), integers are returned as bigint and then converted to string
+		// Integers are returned as strings (BigInt→string conversion)
 		const row = result.rows[0];
 		expect(row).toBeDefined();
-		expect(row![7]).toBe("1"); // applied_steps_count as string (from BigInt conversion)
+		expect(row![7]).toBe("1"); // applied_steps_count as string (BigInt→string)
 
 		await adapter.dispose();
 	});

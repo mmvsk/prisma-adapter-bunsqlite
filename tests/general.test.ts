@@ -548,18 +548,17 @@ beforeEach(async () => {
 			expect(result._max.createdAt?.getTime()).toBe(date3.getTime());
 		});
 
-		test("aggregate min/max on DateTime field (unixepoch-ms + safeIntegers:false)", async () => {
-			// When using unixepoch-ms format with safeIntegers:false, aggregate DateTime works
-			// because values stay as numbers (not BigInt→string), and Prisma can parse them.
+		test("aggregate min/max on DateTime field (unixepoch-ms + allowBigIntToNumberConversion)", async () => {
+			// This test verifies that aggregate DateTime fields work correctly with unixepoch-ms
+			// format when using allowBigIntToNumberConversion option.
 			//
-			// Note: safeIntegers:true (default) causes BigInt→string conversion which breaks
-			// DateTime parsing. Use safeIntegers:false if you don't have BigInt columns.
+			// The adapter converts BigInt values in timestamp range to numbers, allowing
+			// Prisma to correctly parse them as DateTime values.
 
-			// Create a separate adapter with unixepoch-ms format AND safeIntegers: false
 			const unixAdapter = new PrismaBunSqlite({
 				url: ":memory:",
 				timestampFormat: "unixepoch-ms",
-				safeIntegers: false,  // Key fix!
+				allowBigIntToNumberConversion: true, // Fixes DateTime aggregates
 			});
 			const unixPrisma = new PrismaClient({ adapter: unixAdapter });
 
@@ -623,6 +622,41 @@ beforeEach(async () => {
 			expect(result._max.createdAt).toBeInstanceOf(Date);
 			expect(result._min.createdAt?.getTime()).toBe(date1.getTime());
 			expect(result._max.createdAt?.getTime()).toBe(date3.getTime());
+		});
+
+		test("aggregate min/max on DateTime field (unixepoch-ms + allowUnsafeDateTimeAggregates)", async () => {
+			// This test verifies behavior when user acknowledges the DateTime aggregate limitation
+			// but doesn't want BigInt→number conversion (e.g., they have BigInt columns).
+			// With allowUnsafeDateTimeAggregates, aggregates may return Invalid Date.
+
+			const unixAdapter = new PrismaBunSqlite({
+				url: ":memory:",
+				timestampFormat: "unixepoch-ms",
+				allowUnsafeDateTimeAggregates: true, // Accept limitation
+			});
+			const unixPrisma = new PrismaClient({ adapter: unixAdapter });
+
+			await unixPrisma.$executeRaw`
+				CREATE TABLE Post (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					title TEXT NOT NULL,
+					createdAt INTEGER NOT NULL
+				)
+			`;
+
+			const date1 = new Date("2023-01-01T10:00:00Z");
+			await unixPrisma.$executeRaw`
+				INSERT INTO Post (title, createdAt) VALUES ('Post 1', ${date1.getTime()})
+			`;
+
+			const result = await unixPrisma.post.aggregate({
+				_min: { createdAt: true },
+			});
+
+			// With allowUnsafeDateTimeAggregates, the result is Invalid Date
+			// because BigInt→string conversion happens and Prisma can't parse it
+			expect(result._min.createdAt).toBeInstanceOf(Date);
+			expect(Number.isNaN(result._min.createdAt?.getTime())).toBe(true); // Invalid Date
 		});
 
 		test("count with where", async () => {
@@ -1213,5 +1247,95 @@ beforeEach(async () => {
 
 			expect(user.age).toBe(0);
 			expect(user.balance).toBe(-50.5);
+		});
+	});
+
+	describe("Configuration Validation", () => {
+		test("unixepoch-ms without acknowledgment option throws error", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					timestampFormat: "unixepoch-ms",
+					// Missing required acknowledgment option
+				});
+			}).toThrow(/timestampFormat "unixepoch-ms" requires explicit acknowledgment/);
+		});
+
+		test("unixepoch-ms with both options throws error", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					timestampFormat: "unixepoch-ms",
+					allowBigIntToNumberConversion: true,
+					allowUnsafeDateTimeAggregates: true,
+				});
+			}).toThrow(/Cannot set both/);
+		});
+
+		test("allowBigIntToNumberConversion without unixepoch-ms throws error", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					allowBigIntToNumberConversion: true,
+				});
+			}).toThrow(/only applicable when timestampFormat is "unixepoch-ms"/);
+		});
+
+		test("allowUnsafeDateTimeAggregates without unixepoch-ms throws error", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					allowUnsafeDateTimeAggregates: true,
+				});
+			}).toThrow(/only applicable when timestampFormat is "unixepoch-ms"/);
+		});
+
+		test("allowBigIntToNumberConversion with safeIntegers:false throws error", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					timestampFormat: "unixepoch-ms",
+					safeIntegers: false,
+					allowBigIntToNumberConversion: true,
+				});
+			}).toThrow(/only applicable when timestampFormat is "unixepoch-ms" with safeIntegers enabled/);
+		});
+
+		test("unixepoch-ms with allowBigIntToNumberConversion is valid", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					timestampFormat: "unixepoch-ms",
+					allowBigIntToNumberConversion: true,
+				});
+			}).not.toThrow();
+		});
+
+		test("unixepoch-ms with allowUnsafeDateTimeAggregates is valid", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					timestampFormat: "unixepoch-ms",
+					allowUnsafeDateTimeAggregates: true,
+				});
+			}).not.toThrow();
+		});
+
+		test("unixepoch-ms with safeIntegers:false is valid", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+					timestampFormat: "unixepoch-ms",
+					safeIntegers: false,
+				});
+			}).not.toThrow();
+		});
+
+		test("iso8601 (default) without any options is valid", () => {
+			expect(() => {
+				new PrismaBunSqlite({
+					url: ":memory:",
+				});
+			}).not.toThrow();
 		});
 	});

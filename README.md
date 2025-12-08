@@ -3,13 +3,13 @@
 Reliable, fast, zero-dependency Prisma adapter for Bun's native SQLite.
 
 [![npm](https://img.shields.io/npm/v/prisma-adapter-bun-sqlite)](https://www.npmjs.com/package/prisma-adapter-bun-sqlite)
-[![tests](https://img.shields.io/badge/tests-137%2F137-success)](./tests)
+[![tests](https://img.shields.io/badge/tests-147%2F147-success)](./tests)
 [![bun](https://img.shields.io/badge/bun-1.3.3+-black)](https://bun.sh)
 [![prisma](https://img.shields.io/badge/prisma-7.0+-blue)](https://prisma.io)
 
 ## Why This Adapter?
 
-- **Fully-tested** - 135 tests including 40 scenarios ported from Prisma's official test suite
+- **Fully-tested** - 147 tests including 40 scenarios ported from Prisma's official test suite
 - **Drop-in replacement** - Compatible with `@prisma/adapter-libsql` and `@prisma/adapter-better-sqlite3`
 - **Production-ready** - WAL mode, safe integers, proper error mapping to Prisma codes (P2002, P2003, etc.)
 - **Zero dependencies** - Uses Bun's native `bun:sqlite`, no Node.js packages or native binaries
@@ -64,7 +64,9 @@ const users = await prisma.user.findMany();
 | `url` | `string` | required | Database path (`file:./path/to/db.sqlite`) or `:memory:` |
 | `shadowDatabaseUrl` | `string` | `":memory:"` | Shadow DB for migrations |
 | `safeIntegers` | `boolean` | `true` | Prevent precision loss for BigInt |
-| `timestampFormat` | `"iso8601"` \| `"unixepoch-ms"` | `"iso8601"` | DateTime storage format |
+| `timestampFormat` | `"iso8601"` \| `"unixepoch-ms"` | `"iso8601"` | DateTime storage. `iso8601` is safe; `unixepoch-ms` requires workaround (see [Timestamp Format](#timestamp-format)) |
+| `allowBigIntToNumberConversion` | `boolean` | `false` | With `unixepoch-ms`: converts BigInts in timestamp range to numbers (see [Timestamp Format](#timestamp-format)) |
+| `allowUnsafeDateTimeAggregates` | `boolean` | `false` | With `unixepoch-ms`: accepts DateTime aggregate limitation (see [Timestamp Format](#timestamp-format)) |
 | `wal` | `boolean` \| `WalConfiguration` | `undefined` | WAL mode configuration |
 
 ```typescript
@@ -81,6 +83,75 @@ const adapter = new PrismaBunSqlite({
   },
 });
 ```
+
+### Timestamp Format
+
+The adapter supports two DateTime storage formats:
+
+| Format | Storage | Pros | Cons |
+|--------|---------|------|------|
+| `iso8601` (default) | `TEXT` | Safe, human-readable, SQLite date functions work | Slightly larger storage |
+| `unixepoch-ms` | `INTEGER` | Compact, fast comparisons | Requires workaround (see below) |
+
+**Recommendation:** Use `iso8601` (default). It's safe and works correctly in all cases.
+
+#### Why `unixepoch-ms` needs a workaround
+
+When using `timestampFormat: "unixepoch-ms"` with `safeIntegers: true` (the default), DateTime aggregate functions (`_min`, `_max`) return `Invalid Date`.
+
+**Why this happens:** Unix timestamps in milliseconds (e.g., `1733644800000`) exceed JavaScript's safe integer range when stored as SQLite INTEGER. With `safeIntegers: true`, SQLite returns these as BigInt, but Prisma expects numbers for DateTime aggregates.
+
+This is a known limitation that also affects the official `@prisma/adapter-better-sqlite3`.
+
+#### Choosing `unixepoch-ms`
+
+If you want `unixepoch-ms` (e.g., for performance or existing schema), you must choose one of three workarounds:
+
+**Option 1: `safeIntegers: false`** (simplest, if your data allows)
+
+```typescript
+const adapter = new PrismaBunSqlite({
+  url: "file:./db.sqlite",
+  timestampFormat: "unixepoch-ms",
+  safeIntegers: false,  // All integers returned as JS numbers
+});
+```
+
+- All integers are JavaScript numbers (no BigInt)
+- **Compromise:** Integers outside `Number.MAX_SAFE_INTEGER` (±9007199254740991) lose precision
+- **Safe when:** Your BIGINT columns stay within safe integer range
+
+**Option 2: `allowBigIntToNumberConversion: true`** (fixes aggregates, mixed return types)
+
+```typescript
+const adapter = new PrismaBunSqlite({
+  url: "file:./db.sqlite",
+  timestampFormat: "unixepoch-ms",
+  allowBigIntToNumberConversion: true,
+});
+```
+
+- BigInts in timestamp range (0 to ~year 2200) are converted to numbers
+- Other BigInts remain as strings (Prisma's standard BigInt format)
+- **Compromise:** Integer return types are mixed (some `number`, some `string`)
+- **Safe when:** You're aware of the mixed types and handle them accordingly
+
+**Option 3: `allowUnsafeDateTimeAggregates: true`** (accepts limitation)
+
+```typescript
+const adapter = new PrismaBunSqlite({
+  url: "file:./db.sqlite",
+  timestampFormat: "unixepoch-ms",
+  allowUnsafeDateTimeAggregates: true,
+});
+```
+
+- All BigInts consistently returned as strings
+- DateTime aggregates (`_min`, `_max`) return `Invalid Date`
+- **This is what `@prisma/adapter-better-sqlite3` does**
+- **Safe when:** You don't use `_min`/`_max` on DateTime fields, or handle `Invalid Date`
+
+Using `unixepoch-ms` without one of these options throws an error at adapter creation.
 
 ## Features
 
@@ -199,7 +270,6 @@ const prisma = new PrismaClient({ adapter });
 - **Single writer** - SQLite limitation (readers unlimited)
 - **Local only** - No network support (use libsql for Turso)
 - **SERIALIZABLE only** - SQLite's only isolation level
-- **Aggregate DateTime with `unixepoch-ms`** - When using `timestampFormat: "unixepoch-ms"` with `safeIntegers: true` (default), aggregate functions (`_min`, `_max`) on DateTime fields return `Invalid Date`. This occurs because SQLite returns integers for aggregates, which get converted to BigInt strings that JavaScript's `Date` constructor cannot parse. Set `safeIntegers: false` if you don't have BigInt columns.
 
 ## Architecture
 
