@@ -11,7 +11,7 @@ Reliable, fast, zero-dependency Prisma adapter for Bun's native SQLite.
 
 ## Project Status
 
-**v0.6.3** - 147/147 tests passing
+**v0.6.4** - 158/158 tests passing
 
 ## Compatibility
 
@@ -31,7 +31,8 @@ src/
 ├── transaction.ts    # BunSqliteTransaction + AsyncMutex
 ├── adapter.ts        # BunSqliteAdapter class
 ├── factory.ts        # PrismaBunSqlite factory
-└── migration.ts      # Programmatic migration utilities
+├── migration.ts      # Programmatic migration utilities
+└── sanity-check.ts   # Runtime validation (checkWalMode, checkForeignKeys)
 
 tests/
 ├── general.test.ts           # Core adapter (57 tests)
@@ -39,6 +40,7 @@ tests/
 ├── shadow-database.test.ts   # Shadow DB (9 tests)
 ├── wal-and-types.test.ts     # WAL + types (18 tests)
 ├── official-scenarios.test.ts # Official Prisma scenarios (40 tests)
+├── sanity-check.test.ts      # Sanity check utilities (11 tests)
 └── benchmark.ts              # Performance benchmark (not a test file)
 ```
 
@@ -63,6 +65,8 @@ tests/
 | `convertDriverError()` | `errors.ts` | SQLite → Prisma errors |
 | `runMigrations()` | `migration.ts` | Apply migrations |
 | `createTestDatabase()` | `migration.ts` | :memory: DB with migrations |
+| `checkWalMode()` | `sanity-check.ts` | Verify WAL mode is enabled |
+| `checkForeignKeys()` | `sanity-check.ts` | Verify FK constraints are enabled |
 
 ## Testing
 
@@ -143,6 +147,18 @@ const adapter = await createTestDatabase([
 // Load and apply from filesystem
 const migrations = await loadMigrationsFromDir("./prisma/migrations");
 await runMigrations(adapter, migrations);
+```
+
+## Sanity Check Utilities
+
+Separate import from `prisma-adapter-bun-sqlite/sanity-check`:
+
+```typescript
+import { checkWalMode, checkForeignKeys } from "prisma-adapter-bun-sqlite/sanity-check";
+
+// At application startup
+await checkForeignKeys(prisma);  // Throws if foreign_keys != 1
+await checkWalMode(prisma);      // Throws if journal_mode != "wal"
 ```
 
 ## Common Issues

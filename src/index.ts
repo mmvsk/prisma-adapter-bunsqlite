@@ -23,3 +23,6 @@ export {
 	type Migration,
 	type MigrationOptions,
 } from "./migration.js";
+
+// Sanity check utilities
+export { checkWalMode, checkForeignKeys } from "./sanity-check.js";

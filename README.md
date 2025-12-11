@@ -3,13 +3,13 @@
 Reliable, fast, zero-dependency Prisma adapter for Bun's native SQLite.
 
 [![npm](https://img.shields.io/npm/v/prisma-adapter-bun-sqlite)](https://www.npmjs.com/package/prisma-adapter-bun-sqlite)
-[![tests](https://img.shields.io/badge/tests-147%2F147-success)](./tests)
+[![tests](https://img.shields.io/badge/tests-158%2F158-success)](./tests)
 [![bun](https://img.shields.io/badge/bun-1.3.3+-black)](https://bun.sh)
 [![prisma](https://img.shields.io/badge/prisma-7.0+-blue)](https://prisma.io)
 
 ## Why This Adapter?
 
-- **Fully-tested** - 147 tests including 40 scenarios ported from Prisma's official test suite
+- **Fully-tested** - 158 tests including 40 scenarios ported from Prisma's official test suite
 - **Drop-in replacement** - Compatible with `@prisma/adapter-libsql` and `@prisma/adapter-better-sqlite3`
 - **Production-ready** - WAL mode, safe integers, proper error mapping to Prisma codes (P2002, P2003, etc.)
 - **Zero dependencies** - Uses Bun's native `bun:sqlite`, no Node.js packages or native binaries
@@ -262,6 +262,37 @@ const prisma = new PrismaClient({ adapter });
 | Bun | ✅ |
 | Node.js | ❌ (use better-sqlite3 adapter) |
 | Browser | ❌ |
+
+## Sanity Checks
+
+Optional runtime validation to verify your SQLite database is configured correctly:
+
+```typescript
+import { checkWalMode, checkForeignKeys } from "prisma-adapter-bun-sqlite";
+// Or: import { checkWalMode, checkForeignKeys } from "prisma-adapter-bun-sqlite/sanity-check";
+
+// At application startup
+await checkForeignKeys(prisma);  // Throws if foreign_keys != 1
+await checkWalMode(prisma);      // Throws if journal_mode != "wal"
+```
+
+### `checkForeignKeys(prisma)`
+
+Validates that foreign key constraints are enabled. SQLite disables these by default, which can lead to orphaned records and data integrity issues.
+
+**Note:** If using `PrismaBunSqlite`, foreign keys are enabled by default.
+
+### `checkWalMode(prisma)`
+
+Validates that WAL (Write-Ahead Logging) mode is enabled. WAL mode provides better concurrency and performance for most workloads.
+
+Both functions throw descriptive errors with the actual vs expected values and remediation instructions:
+
+```
+Error: SQLite foreign key constraints are not enabled.
+Expected foreign_keys = 1, got 0.
+Enable foreign keys by running: PRAGMA foreign_keys = ON;
+```
 
 ## Limitations
 

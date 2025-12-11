@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.4] - 2025-12-11
+
+### Added
+
+- **Sanity Check Utilities** - Runtime validation functions to verify SQLite database configuration:
+  - `checkWalMode(prisma)` - Throws if WAL mode is not enabled
+  - `checkForeignKeys(prisma)` - Throws if foreign key constraints are not enabled
+  - Clear error messages with actual vs expected values and remediation instructions
+  - Available via main export or separate subpath: `prisma-adapter-bun-sqlite/sanity-check`
+
+### Compatibility
+
+- 158 tests passing (11 new tests for sanity check utilities)
+- Supports Prisma 7.0.0+ and Bun 1.3.3+
+
+---
+
 ## [0.6.3] - 2025-12-08
 
 ### Added
